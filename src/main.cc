@@ -146,7 +146,11 @@ int main(int argc, char** argv)
   std::string file_v("../src/shaders/pbr.vert.glsl");
   std::string file_f("../src/shaders/pbr.frag.glsl");
   
-  program::program* instance = program::program::make_program(file_v, file_f);
+  auto shaders_src = std::vector<std::pair<GLenum, std::string>>({
+                            { GL_VERTEX_SHADER, file_v},
+                            { GL_FRAGMENT_SHADER, file_f}
+                          });
+  program::program* instance = program::program::make_program(shaders_src);
 
   instance->use();
 

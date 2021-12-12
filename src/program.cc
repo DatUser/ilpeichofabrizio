@@ -26,17 +26,20 @@ namespace program
     return std::string{};
   }
 
-  program* program::make_program(std::string& vertex_shader_src,
-    std::string& fragment_shader_src)
+  program* program::make_program(std::vector<std::pair<GLenum, std::string>>& shaders_src)
+    /*std::string& vertex_shader_src,
+    std::string& fragment_shader_src)*/
   {
     //Create new program
     program* instance =  new program();
 
     //Load and compile shaders
-    instance->vertex_shader =
+    for (auto shader : shaders_src)
+      instance->shaders.push_back(load_and_compile(shader.first, shader.second));
+    /*instance->vertex_shader =
       load_and_compile(GL_VERTEX_SHADER, vertex_shader_src);
     instance->fragment_shader =
-      load_and_compile(GL_FRAGMENT_SHADER, fragment_shader_src);
+      load_and_compile(GL_FRAGMENT_SHADER, fragment_shader_src);*/
 
     //Create program and attach shaders
     instance->create_program();
@@ -90,8 +93,11 @@ namespace program
     id = glCreateProgram(); TEST_OPENGL_ERROR(); 
 
     //Attach shaders to program
-    glAttachShader(id, vertex_shader);TEST_OPENGL_ERROR();
-    glAttachShader(id, fragment_shader);TEST_OPENGL_ERROR();
+    for (GLuint shader : shaders)
+      glAttachShader(id, shader);
+    
+    /*glAttachShader(id, vertex_shader);TEST_OPENGL_ERROR();
+    glAttachShader(id, fragment_shader);TEST_OPENGL_ERROR();*/
 
     //Link program
     glLinkProgram(id);TEST_OPENGL_ERROR();
@@ -113,8 +119,10 @@ namespace program
       glDeleteProgram(id);
       
       //Delete shaders
-      glDeleteShader(vertex_shader);
-      glDeleteShader(fragment_shader);
+      for (GLuint shader : shaders)
+        glDeleteShader(shader);
+      /*glDeleteShader(vertex_shader);
+      glDeleteShader(fragment_shader);*/
 
       errx(1, "Error creating program: %s", std::string(infoLog.begin(),
 	    infoLog.end()).c_str());

@@ -22,19 +22,29 @@ namespace program
 class program
 {
   public:
-    program() = default;
+    program()
+    : shaders(std::vector<GLuint>{})
+    {
+    }
 
     ~program()
     {
-      glDetachShader(id, vertex_shader);
+      /*glDetachShader(id, vertex_shader);
       glDetachShader(id, fragment_shader);
 
       glDeleteShader(vertex_shader);
-      glDeleteShader(fragment_shader);
+      glDeleteShader(fragment_shader);*/
+
+      for (GLuint shader : shaders)
+      {
+        glDetachShader(id, shader);
+        glDeleteShader(shader);
+      }
     }
 
-    static program *make_program(std::string& vertex_shader_src,
-	std::string& fragment_shader_src);
+    static program *make_program(std::vector<std::pair<GLenum, std::string>>& shaders_src);
+      /*std::string& vertex_shader_src,
+	std::string& fragment_shader_src);*/
 
     char* get_log();
 
@@ -51,8 +61,9 @@ class program
     //Program id
     GLuint id;
 
-    GLuint vertex_shader;
-    GLuint fragment_shader;
+    //GLuint vertex_shader;
+    //GLuint fragment_shader;
+    std::vector<GLuint> shaders;
 };
 
 std::string load_from_file(std::string& file);
