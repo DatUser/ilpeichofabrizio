@@ -1,8 +1,5 @@
 #include "program.hh"
 
-namespace program
-{
-
   //Loads shader from file
   std::string load_from_file(std::string& file)
   {
@@ -136,5 +133,3 @@ namespace program
   {
     glUseProgram(id);TEST_OPENGL_ERROR();
   }
-
-}

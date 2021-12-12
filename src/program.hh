@@ -16,9 +16,6 @@
                                       << " line " << __LINE__ << std::endl;             \
   } while(0)
 
-namespace program
-{
-
 class program
 {
   public:
@@ -69,5 +66,3 @@ class program
 std::string load_from_file(std::string& file);
 
 GLuint load_and_compile(GLenum shader_type, std::string& file);
-
-}

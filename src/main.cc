@@ -14,6 +14,10 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 
+#include <imgui.h>
+#include "../bindings/imgui_impl_opengl3.h"
+#include "../bindings/imgui_impl_glut.h"
+
 #include "program.hh"
 #include "vector3.hh"
 #include "sphere.hh"
@@ -42,9 +46,21 @@ void display()
   //glMatrixMode(GL_MODELVIEW);
   //glLoadIdentity();
   //
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGLUT_NewFrame();
+  ImGui::NewFrame(); 
+
+  static glm::vec4 color(1.0, 1.0, 1.0, 1.0);
+  ImGui::ColorEdit3("color", &color[0]);
+
+
   glBindVertexArray(VAO);TEST_OPENGL_ERROR();
   glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);TEST_OPENGL_ERROR();
   glBindVertexArray(0);TEST_OPENGL_ERROR();
+
+
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
   glutSwapBuffers(); TEST_OPENGL_ERROR();
 }
@@ -79,7 +95,7 @@ void init()
   glDepthFunc(GL_LESS);TEST_OPENGL_ERROR();
 }
 
-void init_vbo(program::program* instance)
+void init_vbo(program* instance)
 {if (!instance) return;
   Point3 center(0, 0, 0);
   Sphere s(center, 1);
@@ -113,7 +129,7 @@ void init_vbo(program::program* instance)
   glBindVertexArray(0);
 }
 
-void init_uniform(program::program* instance)
+void init_uniform(program* instance)
 {
   glm::vec3 camPos = glm::vec3(0.0f, 0.0f, 4.0f);
   glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -131,6 +147,8 @@ void init_uniform(program::program* instance)
   glUniformMatrix4fv(projection_location, 1, GL_FALSE, &locToProj[0][0]);
   TEST_OPENGL_ERROR();
 }
+
+
 
 int main(int argc, char** argv)
 {
@@ -150,14 +168,29 @@ int main(int argc, char** argv)
                             { GL_VERTEX_SHADER, file_v},
                             { GL_FRAGMENT_SHADER, file_f}
                           });
-  program::program* instance = program::program::make_program(shaders_src);
+  program* instance = program::make_program(shaders_src);
 
   instance->use();
 
   init_vbo(instance);
   init_uniform(instance);
 
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO();
+  (void)io;
+
+	ImGui::StyleColorsDark();
+
+	ImGui_ImplGLUT_Init();
+	ImGui_ImplGLUT_InstallFuncs();
+	ImGui_ImplOpenGL3_Init();
+
   glutMainLoop();
+  
+  ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGLUT_Shutdown();
+	ImGui::DestroyContext();
 
   delete instance;
 
