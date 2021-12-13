@@ -8,7 +8,7 @@ in vec3 worldPos;
 in vec3 vNormalWS;
 in vec3 vviewDir;
 
-vec3 albedo = vec3(1.0, 1.0, 1.0);
+uniform vec3 albedo;// = vec3(1.0, 1.0, 1.0);
 
 const float PI = 3.1415926535897932384626433832795;
 float metalness = 0.0;//1 if metallic 0 otherwise

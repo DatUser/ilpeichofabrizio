@@ -39,30 +39,43 @@ GLuint VBO;
 GLuint VAO;
 GLuint EBO;
 
+glm::vec2 start_pos;
+glm::vec2 end_pos;
+
+program* instance; 
+
 void display()
 {
-  //glClearColor(1.0, 0.0, 0.0, 1.0);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
-  //glMatrixMode(GL_MODELVIEW);
-  //glLoadIdentity();
-  //
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGLUT_NewFrame();
-  ImGui::NewFrame(); 
 
-  static glm::vec4 color(1.0, 1.0, 1.0, 1.0);
+  glClearColor(0.45, 0.6, 0.99, 1.0);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
+  //glMatrixMode(GL_MODELVIEW);TEST_OPENGL_ERROR();
+  //glLoadIdentity();TEST_OPENGL_ERROR();
+  //
+  //ImGui::NewFrame();
+
+  ImGui::Begin("Parameters");
+
+  static glm::vec3 color(1.0, 1.0, 1.0);
   ImGui::ColorEdit3("color", &color[0]);
+  instance->set_vec3("albedo", color);TEST_OPENGL_ERROR();
 
 
   glBindVertexArray(VAO);TEST_OPENGL_ERROR();
   glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);TEST_OPENGL_ERROR();
   glBindVertexArray(0);TEST_OPENGL_ERROR();
 
+  ImGui::End();
 
   ImGui::Render();
+	//ImGuiIO& io = ImGui::GetIO();
+	//glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
   glutSwapBuffers(); TEST_OPENGL_ERROR();
+  glutPostRedisplay(); TEST_OPENGL_ERROR();
 }
 
 void resize(int width, int height)
@@ -129,6 +142,59 @@ void init_vbo(program* instance)
   glBindVertexArray(0);
 }
 
+void mouseFunc(int glut_button, int state, int x, int y)
+{
+  ImGuiIO& io = ImGui::GetIO();
+  io.MousePos = ImVec2((float) x, (float) y);
+
+  int button;
+  switch (glut_button)
+  {
+  case GLUT_LEFT_BUTTON:
+    button = 0;
+    break;
+  case GLUT_RIGHT_BUTTON:
+    button = 1;
+    break;
+  case GLUT_MIDDLE_BUTTON:
+    button = 2;
+    break;
+  default:
+    button = -1;
+    break;
+  }
+
+  if (button >= 0)
+  {
+    switch (state)
+    {
+    case GLUT_DOWN:
+      io.MouseDown[button] = true;
+      start_pos.x = (!button) ? x : start_pos.x;
+      start_pos.x = (!button) ? y : start_pos.y;
+      std::cout << "Click: " << x << " - " << y << std::endl;
+      break;
+    case GLUT_UP:
+      io.MouseDown[button] = false;
+      end_pos.x = (!button) ? x : end_pos.x;
+      end_pos.x = (!button) ? y : end_pos.y;
+      std::cout << "Drop: " << x << " - " << y << std::endl;
+      break;
+    
+    default:
+      break;
+    }
+  }
+}
+
+void motionFunc(int x, int y)
+{
+  end_pos.x = x;
+  end_pos.y = y;
+  ImGuiIO& io = ImGui::GetIO();
+  io.MousePos = ImVec2((float) x, (float) y);
+}
+
 void init_uniform(program* instance)
 {
   glm::vec3 camPos = glm::vec3(0.0f, 0.0f, 4.0f);
@@ -168,7 +234,7 @@ int main(int argc, char** argv)
                             { GL_VERTEX_SHADER, file_v},
                             { GL_FRAGMENT_SHADER, file_f}
                           });
-  program* instance = program::make_program(shaders_src);
+  instance = program::make_program(shaders_src);
 
   instance->use();
 
@@ -184,6 +250,8 @@ int main(int argc, char** argv)
 
 	ImGui_ImplGLUT_Init();
 	ImGui_ImplGLUT_InstallFuncs();
+  glutMotionFunc(motionFunc);
+  glutMouseFunc(mouseFunc);
 	ImGui_ImplOpenGL3_Init();
 
   glutMainLoop();

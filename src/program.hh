@@ -1,7 +1,8 @@
 #pragma once
 
 #include <string>
-#include <GL/glew.h>
+#include <GL/glew.h>    
+#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -48,7 +49,13 @@ class program
     bool is_ready();
 
     void use();
-    
+
+    void set_int(const std::string& name, int value);
+    void set_float(const std::string& name, float value);
+    void set_vec3(const std::string& name, const glm::vec3& value);
+    void set_vec4(const std::string& name, const glm::vec4& value);
+    void set_matrix4(const std::string& name, const glm::mat4& value);
+
     GLuint get_id() const { return id; }
 
   private:
@@ -58,8 +65,6 @@ class program
     //Program id
     GLuint id;
 
-    //GLuint vertex_shader;
-    //GLuint fragment_shader;
     std::vector<GLuint> shaders;
 };
 
