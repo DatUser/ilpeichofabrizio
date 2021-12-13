@@ -35,10 +35,10 @@ Collision collision(Sphere sphere, Ray ray)
 
   vec3 oc = sphere.center - ray.origin;
   float t_ca = dot(oc, ray.dir);
-  float d2 = dot(oc, oc) - t_ca;
+  float d2 = dot(oc, oc) - t_ca * t_ca;
 
   // Ray goes outside of sphere
-  if (d2 > sphere.radius) 
+  if (d2 > sphere.radius * sphere.radius) 
   {
     c.t = -1;
     return c;
@@ -69,7 +69,7 @@ Collision collision(Sphere sphere, Ray ray)
   c.n = normalize(c.p - sphere.center);
 
   // Flip normal if ray inside
-  if (c.inside) c.n *= 1.0;
+  if (c.inside) c.n *= -1.0;
 
   return c;
 }
@@ -77,16 +77,16 @@ Collision collision(Sphere sphere, Ray ray)
 vec3 raytrace(Ray ray)
 {
   Sphere sphere;
-  sphere.center = vec3(0, 0, 3);
-  sphere.radius = 1.0;
+  sphere.center = vec3(0, 0, -3);
+  sphere.radius = 5.0;
 
   Collision c = collision(sphere, ray);
   if (c.t > 0.0)
   {
-    return vec3(1, 0, 0);
+    return vec3(1, 0, 1);
   }
   
-  return vec3(25, 1, 0);
+  return vec3(0, 0, 0);
 }
 
 
@@ -108,7 +108,7 @@ void main()
   
   // Cast the ray out into the world and intersect the ray with objects
   vec3 color = raytrace(ray);
-  //vec3 color = vec3(float(pixel.x) / 64, float(pixel.y) / 64, 1);
+  //vec3 color = vec3(float(pixel.x), float(pixel.y), 1);
   imageStore(output_texture, pixel, vec4(color, 1.0));
   imageStore(debug_texture, pixel, vec4(color, 1.0));
 }
