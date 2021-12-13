@@ -11,6 +11,11 @@ struct Ray
   vec3 dir;
 };
 
+struct Light
+{
+  vec3 position;
+};
+
 struct Sphere
 {
   vec3 center;
@@ -76,17 +81,29 @@ Collision collision(Sphere sphere, Ray ray)
 
 vec3 raytrace(Ray ray)
 {
+  vec3 ambient = vec3(0.05, 0.05, 0.05);
   Sphere sphere;
   sphere.center = vec3(0, 0, -3);
   sphere.radius = 5.0;
 
+  Light light;
+  light.position = vec3(0, 1, 3);
+
   Collision c = collision(sphere, ray);
   if (c.t > 0.0)
   {
-    return vec3(1, 0, 1);
+    vec3 light_dir = normalize(light.position - c.p);
+    vec3 light_refl = normalize(reflect(light_dir, c.n));
+    float cos_theta = dot(light_dir, c.n);
+    float cos_phi = dot(normalize(-ray.dir), light_refl);
+
+    float diffuse = 0.9 * max(cos_theta, 0.0);
+    float specular = 0.9 * pow(max(cos_phi, 0.0), 30);
+    
+    return ambient + vec3(1,0,0) * (diffuse);
   }
   
-  return vec3(0, 0, 0);
+  return ambient;
 }
 
 
