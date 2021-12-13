@@ -66,8 +66,6 @@ void display()
   glDispatchCompute(workGroupsX, workGroupsY, workGroupsZ);
   glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-  std::cout << screenTexture[0] << std::endl;
-
   // PHASE 2 : Display the resulting texture
   display_shader->use();
 

@@ -5,6 +5,8 @@ layout (binding=0, rgba8) uniform image2D output_texture;
 layout (binding=1, rgba32f) uniform image2D debug_texture;
 float camera_pos_z = 5.0;
 
+float EPSILON = 1e-8;
+
 struct Ray
 {
   vec3 origin;
@@ -20,6 +22,13 @@ struct Sphere
 {
   vec3 center;
   float radius;
+};
+
+struct Triangle
+{
+  vec3 p0;
+  vec3 p1;
+  vec3 p2;
 };
 
 struct Collision
@@ -70,7 +79,7 @@ Collision collision(Sphere sphere, Ray ray)
     c.inside = true;
   }
 
-  c.p = ray.origin + ray.dir * t0; 
+  c.p = ray.origin + ray.dir * c.t; 
   c.n = normalize(c.p - sphere.center);
 
   // Flip normal if ray inside
@@ -79,17 +88,92 @@ Collision collision(Sphere sphere, Ray ray)
   return c;
 }
 
+// Möller-Trumbore algorithm : 
+//   - express problem in barycentric coordinate P = wA + uB + vC
+//   - also : P = O + tD
+//   - reorganise equation of intersection (unknowns should be t, u, v)
+//   - solve system using Cramer's rule
+Collision collision(Triangle triangle, Ray ray)
+{
+  vec3 edge1 = triangle.p1 - triangle.p0;
+  vec3 edge2 = triangle.p2 - triangle.p0;
+
+  Collision c;
+  c.inside = false;
+
+  vec3 h = cross(ray.dir, edge2);
+  float a = dot(edge1, h);
+
+  // Parallel ray and triangle
+  if (a > -EPSILON && a < EPSILON)
+  {
+    c.t = -1;
+    return c;
+  }
+
+  float f = 1.0 / a;
+
+  vec3 s = ray.origin - triangle.p0;
+  float u = dot(s, h) * f;
+  if (u < 0.0 || u > 1.0)
+  {
+    c.t = -1;
+    return c;
+  }
+
+  vec3 q = cross(s, edge1);
+  float v = dot(ray.dir, q) * f;
+  if (v < 0.0 || u + v > 1.0)
+  {
+    c.t = -1;
+    return c;
+  }
+
+  float t = dot(edge2, q) * f;
+  if (t < EPSILON)
+  {
+    c.t = -1;
+    return c;
+  }
+
+  c.t = t;
+  c.p = ray.origin + ray.dir * c.t; 
+  c.n = normalize(cross(edge1, edge2));
+
+  return c;
+}
+
+
 vec3 raytrace(Ray ray)
 {
   vec3 ambient = vec3(0.05, 0.05, 0.05);
   Sphere sphere;
   sphere.center = vec3(0, 0, -3);
-  sphere.radius = 5.0;
+  sphere.radius = 2.0;
 
   Light light;
   light.position = vec3(0, 1, 3);
 
+  Triangle triangle;
+  triangle.p0 = vec3(-5, -5, -4);
+  triangle.p1 = vec3(5, -5, -4);
+  triangle.p2 = vec3(0, 5, -10);
+
   Collision c = collision(sphere, ray);
+  if (c.t > 0.0)
+  {
+    vec3 light_dir = normalize(light.position - c.p);
+    vec3 light_refl = normalize(reflect(light_dir, c.n));
+    float cos_theta = dot(light_dir, c.n);
+    float cos_phi = dot(normalize(-ray.dir), light_refl);
+
+    float diffuse = 0.9 * max(cos_theta, 0.0);
+    float specular = 0.9 * pow(max(cos_phi, 0.0), 30);
+    
+    return ambient + vec3(0,0,1) * (diffuse);
+  }
+
+  c = collision(triangle, ray);
   if (c.t > 0.0)
   {
     vec3 light_dir = normalize(light.position - c.p);
