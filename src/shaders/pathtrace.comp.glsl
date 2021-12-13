@@ -2,6 +2,7 @@
 
 layout (local_size_x = 1, local_size_x = 1) in;
 layout (binding=0, rgba8) uniform image2D output_texture;
+layout (binding=1, rgba32f) uniform image2D debug_texture;
 float camera_pos_z = 5.0;
 
 struct Ray
@@ -85,7 +86,7 @@ vec3 raytrace(Ray ray)
     return vec3(1, 0, 0);
   }
   
-  return vec3(0, 0, 0);
+  return vec3(25, 1, 0);
 }
 
 
@@ -109,4 +110,5 @@ void main()
   vec3 color = raytrace(ray);
   //vec3 color = vec3(float(pixel.x) / 64, float(pixel.y) / 64, 1);
   imageStore(output_texture, pixel, vec4(color, 1.0));
+  imageStore(debug_texture, pixel, vec4(color, 1.0));
 }
