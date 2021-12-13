@@ -35,7 +35,7 @@ endif(APPLE)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3")# -fsanitize=address")
 
 add_executable(main)
-target_sources(main PRIVATE "src/main.cc" ${SRC} ${BINDINGS})
+target_sources(main PRIVATE ${SRC} ${BINDINGS})
 target_compile_definitions(main PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLEW)
 
 conan_target_link_libraries(main)
