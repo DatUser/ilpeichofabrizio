@@ -45,8 +45,9 @@ int workGroupsX = width;
 int workGroupsY = height;
 int workGroupsZ = 1;
 
-GLuint screenTextureID; // The texture ID of the full screen texture
+GLuint textures[2]; // The texture ID of the full screen texture
 unsigned char *screenTexture; // The screen texture RGBA8888 color data
+float *debugTexture; // The screen texture RGBA8888 color data
 
 program* pathtrace_shader;
 program* display_shader;
@@ -58,20 +59,20 @@ void display()
 
   // PHASE 1 : Path tracing compute shader
   pathtrace_shader->use();
-  std::cout << "pathtracing" << std::endl;
 
-  glBindImageTexture(0, screenTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+  glBindImageTexture(0, textures[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+  glBindImageTexture(1, textures[1], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
   glDispatchCompute(workGroupsX, workGroupsY, workGroupsZ);
   glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-  std::cout << +screenTexture[0] << std::endl;
+  std::cout << screenTexture[0] << std::endl;
 
   // PHASE 2 : Display the resulting texture
   display_shader->use();
 
   glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, screenTextureID);
+  glBindTexture(GL_TEXTURE_2D, textures[0]);
   glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
   glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
   glEnableVertexAttribArray(0);
@@ -81,6 +82,7 @@ void display()
   glDrawArrays(GL_TRIANGLES, 0, 6);
 
   glutSwapBuffers(); TEST_OPENGL_ERROR();
+  glutPostRedisplay();
 }
 
 void resize(int width, int height)
@@ -139,6 +141,16 @@ int main(int argc, char** argv)
 
   init();
 
+  debugTexture = (float*)malloc(sizeof(float) * 4 * width * height);
+  memset(debugTexture, 0, sizeof(float) * 4 * width * height);
+
+  // Create the OpenGL Texture on which to ray cast the scene
+  glGenTextures(2, textures);
+  glBindTexture(GL_TEXTURE_2D, textures[1]);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, (const void *)debugTexture);
+
   screenTexture = (unsigned char*)malloc(sizeof(unsigned char) * 4 * width * height);
   memset(screenTexture, 0, sizeof(char) * 4 * width * height);
   for (int i = 0; i < height; i++) {
@@ -151,8 +163,7 @@ int main(int argc, char** argv)
   }
 
   // Create the OpenGL Texture on which to ray cast the scene
-  glGenTextures(1, &screenTextureID);
-  glBindTexture(GL_TEXTURE_2D, screenTextureID);
+  glBindTexture(GL_TEXTURE_2D, textures[0]);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void *)screenTexture);
