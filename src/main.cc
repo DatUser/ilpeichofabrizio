@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/vec3.hpp>
 #include <vector>
 
 #include <imgui.h>
@@ -19,7 +20,6 @@
 #include "../bindings/imgui_impl_glut.h"
 
 #include "program.hh"
-#include "vector3.hh"
 #include "sphere.hh"
 
 #define TEST_OPENGL_ERROR()                                                             \
@@ -97,7 +97,7 @@ void init()
 
 void init_vbo(program* instance)
 {if (!instance) return;
-  Point3 center(0, 0, 0);
+  glm::vec3 center(0, 0, 0);
   Sphere s(center, 1);
 
   auto data = s.generate_vertices(500, 500);

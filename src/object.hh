@@ -1,13 +1,14 @@
 #pragma once
 
 #include <vector>
+#include <glm/vec3.hpp>
+
 #include "program.hh"
-#include "vector3.hh"
 
 class Object
 {
 public:
-  Object(Vector3 position);
+  Object(glm::vec3 position);
   ~Object();
 
   static Object* load_object();
@@ -17,7 +18,7 @@ public:
   static void render();
 
 private:
-  Vector3 position;
+  glm::vec3 position;
   std::vector<float> vertices;
   std::vector<float> normals;
   std::vector<float> texCoords;

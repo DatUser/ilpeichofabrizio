@@ -1,12 +1,12 @@
 #pragma once
 
 #include <vector>
-#include "vector3.hh"
+#include <glm/vec3.hpp>
 
 class Sphere
 {
 public:
-    Sphere(Point3& center, float radius);
+    Sphere(glm::vec3 center, float radius);
     
     //Returns vertices and indices
     std::pair<std::vector<float>, std::vector<unsigned int>> generate_vertices(unsigned int stacks, unsigned int sectors);
@@ -15,7 +15,7 @@ public:
 
     ~Sphere() = default;
 private:
-    Point3 center;
+    glm::vec3 center;
     float radius;
 
     std::vector<float> normals;

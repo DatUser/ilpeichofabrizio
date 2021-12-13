@@ -1,7 +1,10 @@
 #include "sphere.hh"
 
+#include <iostream>
+#include <cmath>
 
-Sphere::Sphere(Point3& center, float radius)
+
+Sphere::Sphere(glm::vec3 center, float radius)
 : center(center),
   radius(radius),
   normals(std::vector<float>{})
