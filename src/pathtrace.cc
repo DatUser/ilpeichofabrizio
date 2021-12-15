@@ -80,7 +80,7 @@ void display()
   glDrawArrays(GL_TRIANGLES, 0, 6);
 
   glutSwapBuffers(); TEST_OPENGL_ERROR();
-  glutPostRedisplay();
+  //glutPostRedisplay();
 }
 
 void resize(int width, int height)
