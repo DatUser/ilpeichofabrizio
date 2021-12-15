@@ -62,6 +62,13 @@ void display()
   ImGui::ColorEdit3("color", &color[0]);
   instance->set_vec3("albedo", color);TEST_OPENGL_ERROR();
 
+  static float roughness = 0.0;
+  ImGui::SliderFloat("roughness", &roughness, 0.00, 1.0);
+  instance->set_float("roughness", roughness);
+
+  static float metalness = 0.0;
+  ImGui::SliderFloat("metalness", &metalness, 0.00, 1.0);
+  instance->set_float("metalness", metalness);
 
   glBindVertexArray(VAO);TEST_OPENGL_ERROR();
   glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);TEST_OPENGL_ERROR();
@@ -172,13 +179,11 @@ void mouseFunc(int glut_button, int state, int x, int y)
       io.MouseDown[button] = true;
       start_pos.x = (!button) ? x : start_pos.x;
       start_pos.x = (!button) ? y : start_pos.y;
-      std::cout << "Click: " << x << " - " << y << std::endl;
       break;
     case GLUT_UP:
       io.MouseDown[button] = false;
       end_pos.x = (!button) ? x : end_pos.x;
       end_pos.x = (!button) ? y : end_pos.y;
-      std::cout << "Drop: " << x << " - " << y << std::endl;
       break;
     
     default:
@@ -200,6 +205,7 @@ void init_uniform(program* instance)
   glm::vec3 camPos = glm::vec3(0.0f, 0.0f, 4.0f);
   glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 camFront = glm::vec3(0.0f, 0.0f, -1.0f);
+  instance->set_vec3("cameraPos", camPos);
 
 
   glm::mat4 proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 100.0f); 
@@ -227,8 +233,11 @@ int main(int argc, char** argv)
 
   init();
 
+  //std::string file_f("../src/shaders/test.frag.glsl");
   std::string file_v("../src/shaders/pbr.vert.glsl");
   std::string file_f("../src/shaders/pbr.frag.glsl");
+  //std::string file_v("../src/shaders/glint.vert.glsl");
+  //std::string file_f("../src/shaders/glint.frag.glsl");
   
   auto shaders_src = std::vector<std::pair<GLenum, std::string>>({
                             { GL_VERTEX_SHADER, file_v},
