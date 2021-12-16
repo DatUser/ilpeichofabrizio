@@ -23,6 +23,7 @@ layout (binding=1, rgba32f) uniform image2D debug_texture;
 
 // By Moroz Mykhailo (https://www.shadertoy.com/view/wltcRS)
 uvec4 seed;
+float seed2;
 ivec2 pixel;
 
 void InitRNG(vec2 p, int frame)
@@ -42,6 +43,10 @@ void pcg4d(inout uvec4 v)
 float rand()
 {
     pcg4d(seed); return float(seed.x) / float(0xffffffffu);
+}
+
+vec2 hash2(inout float seed) {
+    return fract(sin(vec2(seed+=0.1,seed+=0.1))*vec2(43758.5453123,22578.1459123));
 }
 
 float distribGGX(float dotNH, float alpha2)
@@ -320,7 +325,7 @@ Collision collision(Triangle triangle, Ray ray)
   return obj_col;
 }
 
-Collision find_nearest(Ray ray)
+Collision intersect_scene(Ray ray)
 {
   collisions[0] = collision(sphere, ray);
   collisions[0].object_index = 0;
@@ -356,16 +361,22 @@ Sample sample_hemisphere(vec3 n, vec2 u)
   vec2 r = vec2(u.x,u.y) * TWO_PI;
 	vec3 dr = vec3(sin(r.x) * vec2(sin(r.y), cos(r.y)), cos(r.x));
 	vec3 wi = dot(dr, n) * dr;
+
+  float pdf = INV_TWO_PI;
   
-  return Sample(wi, INV_PI);
+  return Sample(wi, pdf);
 }
 
 Sample cosine_sample_hemisphere(vec3 n, vec2 u)
 {
-  float theta = acos(sqrt(1.0-u.x));
+  vec3 dir;
+  float r = sqrt(u.x);
   float phi = TWO_PI * u.y;
+  dir.x = r * cos(phi);
+  dir.y = r * sin(phi);
+  dir.z = sqrt(max(0.0, 1.0 - dir.x * dir.x - dir.y * dir.y));
+  vec3 wi = local_to_world(dir, n);
 
-  vec3 wi = local_to_world(spherical_to_cartesian(1.0, phi, theta), n);
   float pdf = abs(dot(wi, n)) * INV_PI;  // FIXME only if same hemisphere
 
   return Sample(wi, pdf);
@@ -388,13 +399,14 @@ vec2 uniform_sample_triangle(vec2 u)
 
 Sample area_sample(Triangle t, vec3 origin)
 {
-  vec2 b = uniform_sample_triangle(vec2(rand(), rand()));
+  //vec2 b = uniform_sample_triangle(vec2(rand(), rand()));
+  vec2 b = uniform_sample_triangle(hash2(seed2));
+
   vec3 sample_pt =  t.p0 * b.x + t.p1 * b.y + t.p2 * (1 - b.x - b.y); 
 
   vec3 dir = normalize(sample_pt - origin);
 
   // Compute area of triangle
-
   vec3 n = cross(t.p1 - t.p0, t.p2 - t.p0);
   float area_pdf = 2 / length(n);     // 1/area : uniform sampling over area
 
@@ -411,11 +423,16 @@ vec3 uniform_sample_one_light(Collision obj_col)
   Sample light_sample = area_sample(light, obj_col.p);
   vec3 wi = light_sample.value;
 
-  Ray ray_in = Ray(obj_col.p, wi);
-  ray_in.dir += obj_col.n * 1e-3 * ((dot(wi, obj_col.n) < 0) ? -1 : 1);
+  // Add small displacement to prevent being on the surface
+  Ray ray_in = Ray(
+    obj_col.p + obj_col.n * 1.0e-3 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
+    wi
+  );
 
-  Collision light_col = find_nearest(ray_in);
+  Collision light_col = intersect_scene(ray_in);
 
+
+  //return wi;
   // Discard if no hit or hit non emissive object 
   if (light_col.t <= 0 || light_col.mat.emission == vec3(0)) return vec3(0);
 
@@ -446,7 +463,7 @@ vec3 pathtrace(Ray ray)
   for (int bounces = 0; ; bounces++)
   {
     // Intersect ray with scene
-    Collision obj_col = find_nearest(ray);
+    Collision obj_col = intersect_scene(ray);
 
     // Stop if no collision or no more bounce
     if (obj_col.t <= 0 || bounces >= max_bounces) break;
@@ -471,20 +488,25 @@ vec3 pathtrace(Ray ray)
 
     // Direct lighting estimation at current path vertex (end of the current path = light)
     L += throughput * uniform_sample_one_light(obj_col);
+    //return L;
 
     // Sample the BSDF at intersection to get the new path direction
-    Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, vec2(rand(), rand()));
+    //Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, vec2(rand(), rand()));
+    Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, hash2(seed2));
 
     vec3 wi = bsdf_sample.value;
     vec3 wo = -ray.dir;
     vec3 f = evaluate_bsdf(wo, wi, obj_col);
 
+    // Update how much light will receive from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
 
-    ray = Ray(obj_col.p, wi);
-
     // Add small displacement to prevent being on the surface
-    ray.dir += obj_col.n * 1e-3 * ((dot(wi, obj_col.n) < 0) ? -1 : 1);
+    ray = Ray(
+      obj_col.p + obj_col.n * 1.0e-3 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
+      wi
+    );
+
   }
 
   return L;
@@ -507,11 +529,13 @@ void main()
   ray.dir = normalize(pixel_world - ray.origin);
   
   // Cast the ray out into the world and intersect the ray with objects
-  int spp = 32;
+  int spp = 128;
   vec3 res = vec3(0);
+  seed2 = x_pixel + y_pixel * 3.43121412313;
   for (int i = 0; i < spp; i++)
   {
     InitRNG(gl_GlobalInvocationID.xy, i);
+
     res += 1.0 / float(spp) * pathtrace(ray);
   } 
   imageStore(output_texture, pixel, vec4(res, 1.0));
