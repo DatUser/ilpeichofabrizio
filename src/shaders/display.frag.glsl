@@ -7,5 +7,5 @@ out vec4 FragColor;
 
 void main()
 {
-  FragColor = vec4( texture2D( tex, uv).rgb, 1.0);
+  FragColor = vec4(texture2D(tex, uv).rgb, 1.0);
 }

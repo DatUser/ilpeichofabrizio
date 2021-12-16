@@ -1,8 +1,11 @@
 #version 450
 
 layout (local_size_x = 1, local_size_x = 1) in;
-layout (binding=0, rgba8) uniform image2D output_texture;
+layout (binding=0, rgba8) uniform image2D prev_frame;
 layout (binding=1, rgba32f) uniform image2D debug_texture;
+layout (binding=2, rgba8) uniform image2D new_frame;
+
+uniform int u_frame;
 
 
 // *****************************************************************************
@@ -21,39 +24,21 @@ layout (binding=1, rgba32f) uniform image2D debug_texture;
 // *                                Utils                                      *
 // *****************************************************************************
 
-// By Moroz Mykhailo (https://www.shadertoy.com/view/wltcRS)
-uvec4 seed;
-float seed2;
-ivec2 pixel;
+uint rngState;
 
-void InitRNG(vec2 p, int frame)
+uint wang_hash(inout uint seed)
 {
-    pixel = ivec2(p);
-    seed = uvec4(p, uint(frame), uint(p.x) + uint(p.y));
+    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
+    seed *= uint(9);
+    seed = seed ^ (seed >> 4);
+    seed *= uint(0x27d4eb2d);
+    seed = seed ^ (seed >> 15);
+    return seed;
 }
 
-void pcg4d(inout uvec4 v)
+float RandomFloat01(inout uint state)
 {
-    v = v * 1664525u + 1013904223u;
-    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
-    v = v ^ (v >> 16u);
-    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
-}
-
-float rand()
-{
-    pcg4d(seed); return float(seed.x) / float(0xffffffffu);
-}
-
-vec2 hash2(inout float seed) {
-    return fract(sin(vec2(seed+=0.1,seed+=0.1))*vec2(43758.5453123,22578.1459123));
-}
-
-float distribGGX(float dotNH, float alpha2)
-{
-  float dotNH2 = pow(dotNH, 2.0);
-  float bot = dotNH2 * (alpha2 - 1.0) + 1.0;
-  return alpha2 / (PI * bot * bot);
+    return float(wang_hash(state)) / 4294967296.0;
 }
 
 // *****************************************************************************
@@ -399,8 +384,8 @@ vec2 uniform_sample_triangle(vec2 u)
 
 Sample area_sample(Triangle t, vec3 origin)
 {
-  //vec2 b = uniform_sample_triangle(vec2(rand(), rand()));
-  vec2 b = uniform_sample_triangle(hash2(seed2));
+  vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
+  vec2 b = uniform_sample_triangle(u);
 
   vec3 sample_pt =  t.p0 * b.x + t.p1 * b.y + t.p2 * (1 - b.x - b.y); 
 
@@ -491,8 +476,8 @@ vec3 pathtrace(Ray ray)
     //return L;
 
     // Sample the BSDF at intersection to get the new path direction
-    //Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, vec2(rand(), rand()));
-    Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, hash2(seed2));
+    vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
+    Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, u);
 
     vec3 wi = bsdf_sample.value;
     vec3 wo = -ray.dir;
@@ -514,6 +499,10 @@ vec3 pathtrace(Ray ray)
 
 void main()
 {
+  rngState = uint(uint(gl_GlobalInvocationID.x) * uint(1973)
+    + uint(gl_GlobalInvocationID.y) * uint(9277)
+    + uint(u_frame) * uint(26699)) | uint(1);
+
   int width = int(gl_NumWorkGroups.x); // one workgroup = one invocation = one pixel
   int height = int(gl_NumWorkGroups.y);
   ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
@@ -527,17 +516,23 @@ void main()
   Ray ray;
   ray.origin = vec3(0.0, 0.0, camera_pos_z);
   ray.dir = normalize(pixel_world - ray.origin);
-  
+
   // Cast the ray out into the world and intersect the ray with objects
-  int spp = 128;
+  int spp = 1;
   vec3 res = vec3(0);
-  seed2 = x_pixel + y_pixel * 3.43121412313;
   for (int i = 0; i < spp; i++)
   {
-    InitRNG(gl_GlobalInvocationID.xy, i);
-
     res += 1.0 / float(spp) * pathtrace(ray);
   } 
-  imageStore(output_texture, pixel, vec4(res, 1.0));
+
+  float blend = 1.0 / (float(u_frame + 1));
+
+  vec3 acc_color = mix(
+    imageLoad(prev_frame, pixel).rgb,
+    res,
+    blend
+  );
+
+  imageStore(new_frame, pixel, vec4(acc_color.xyz, 1.0));
   imageStore(debug_texture, pixel, vec4(res, 1.0));
 }
