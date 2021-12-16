@@ -38,8 +38,8 @@
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
 
-int width = 512;
-int height = 512;
+int width = 1024;
+int height = 1024;
 
 int workGroupsX = width;
 int workGroupsY = height;
