@@ -125,26 +125,89 @@ Material blue = Material(
 Sphere sphere = Sphere(vec3(-1.5, -1.5, -2.5), 1.5, blue);
 Sphere sphere2 = Sphere(vec3(1.5, -1.5, -2.5), 1.5, red);
 
-Triangle triangle0 = Triangle(
-  vec3(5, -3, -5),
-  vec3(-5, -3, -5),
-  vec3(5, -3, 0),
+Triangle floor1 = Triangle(
+  vec3(5, -5, -5),
+  vec3(-5, -5, -5),
+  vec3(5, -5, 0),
   gray
 );
 
-Triangle triangle1 = Triangle(
-  vec3(-5, -3, 0),
-  vec3(5, -3, 0),
-  vec3(-5, -3, -5),
+Triangle floor2 = Triangle(
+  vec3(-5, -5, 0),
+  vec3(5, -5, 0),
+  vec3(-5, -5, -5),
   gray
 );
 
-Triangle triangle2 = Triangle(
-  vec3(-10, 4, -10),
-  vec3(10, 4, -10),
-  vec3(0, 0, 10),
+Triangle ceil1 = Triangle(
+  vec3(5, 5, -5),
+  vec3(-5, 5, -5),
+  vec3(5, 5, 0),
+  gray
+);
+
+Triangle ceil2 = Triangle(
+  vec3(-5, 5, 0),
+  vec3(5, 5, 0),
+  vec3(-5, 5, -5),
+  gray
+);
+
+Triangle left1 = Triangle(
+  vec3(-5,  5, -5),
+  vec3(-5,  -5, -5),
+  vec3(-5,  -5,  0),
+  gray
+);
+
+Triangle left2 = Triangle(
+  vec3(-5,  5, 0),
+  vec3(-5,  5, -5),
+  vec3(-5,  -5,  0),
+  gray
+);
+
+Triangle right1 = Triangle(
+  vec3( 5,  5, -5),
+  vec3( 5,  -5, -5),
+  vec3( 5,  -5,  0),
+  gray
+);
+
+Triangle right2 = Triangle(
+  vec3( 5,  5, 0),
+  vec3( 5,  5, -5),
+  vec3( 5,  -5,  0),
+  gray
+);
+
+Triangle back1 = Triangle(
+  vec3( 5,  -5, -5),
+  vec3( -5,  -5, -5),
+  vec3(-5,  5,  -5),
+  gray
+);
+
+Triangle back2 = Triangle(
+  vec3( 5,  -5, -5),
+  vec3( 5,  5, -5),
+  vec3(-5,  5,  -5),
+  gray
+);
+
+Triangle light2 = Triangle(
+  vec3(5, 4.9, -5),
+  vec3(-5, 4.9, -5),
+  vec3(5, 4.9, 0),
   emissive
 );
+
+//Triangle light2 = Triangle(
+//  vec3(-2.5, 4.99, -2.5),
+//  vec3(2.5, 4.99, -2.5),
+//  vec3(0, 4.99, 2.5),
+//  emissive
+//);
 
 //Triangle triangle2 = Triangle(
 //  vec3(5, 2, -5),
@@ -160,10 +223,10 @@ Triangle triangle3 = Triangle(
   emissive
 );
 
-float camera_pos_z = 3.0;
+float camera_pos_z = 7.0;
 
 
-Collision collisions[5];
+Collision collisions[42];
 
 vec3 ambient = vec3(0.05, 0.05, 0.05);
 
@@ -312,21 +375,25 @@ Collision collision(Triangle triangle, Ray ray)
 
 Collision intersect_scene(Ray ray)
 {
-  collisions[0] = collision(sphere, ray);
-  collisions[0].object_index = 0;
-  collisions[1] = collision(triangle0, ray);
-  collisions[1].object_index = 1;
-  collisions[2] = collision(triangle1, ray);
-  collisions[2].object_index = 2;
-  collisions[3] = collision(triangle2, ray);
-  collisions[3].object_index = 3;
-  collisions[4] = collision(sphere2, ray);
-  collisions[4].object_index = 4;
+  int n = 0;
+  collisions[n] = collision(sphere, ray); n++;
+  collisions[n] = collision(floor1, ray); n++;
+  collisions[n] = collision(floor2, ray); n++;
+  //collisions[n] = collision(ceil1, ray); n++;
+  //collisions[n] = collision(ceil2, ray); n++;
+  collisions[n] = collision(left1, ray); n++;
+  collisions[n] = collision(left2, ray); n++;
+  collisions[n] = collision(right1, ray); n++;
+  collisions[n] = collision(right2, ray); n++;
+  collisions[n] = collision(back1, ray); n++;
+  collisions[n] = collision(back2, ray); n++;
+  collisions[n] = collision(light2, ray); n++;
+  collisions[n] = collision(sphere2, ray); n++;
 
   float infinity = 1.0 / 0.0;
   float min_val = infinity;
   int min_i = -1;
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < n; i++)
   {
     if (collisions[i].t > 0 && min_val > collisions[i].t)
     {
@@ -402,7 +469,7 @@ Sample area_sample(Triangle t, vec3 origin)
 vec3 uniform_sample_one_light(Collision obj_col)
 {
   // TODO: pick random light
-  Triangle light = triangle2;
+  Triangle light = light2;
 
   // Sample a ray direction from light to collision point
   Sample light_sample = area_sample(light, obj_col.p);
@@ -472,7 +539,7 @@ vec3 pathtrace(Ray ray)
     // TODO: Compute scattering functions and skip over medium boundaries
 
     // Direct lighting estimation at current path vertex (end of the current path = light)
-    L += throughput * uniform_sample_one_light(obj_col);
+    L += throughput * 4 * uniform_sample_one_light(obj_col);
     //return L;
 
     // Sample the BSDF at intersection to get the new path direction
