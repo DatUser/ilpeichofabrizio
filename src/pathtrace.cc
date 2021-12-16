@@ -38,8 +38,8 @@
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
 
-int width = 1024;
-int height = 1024;
+int width = 512;
+int height = 512;
 
 int workGroupsX = width;
 int workGroupsY = height;
@@ -94,7 +94,7 @@ bool initGlut(int &argc, char* argv[])
   glutInitContextVersion(4, 5);TEST_OPENGL_ERROR();
   glutInitContextProfile(GLUT_CORE_PROFILE|GLUT_DEBUG);TEST_OPENGL_ERROR();
   glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);TEST_OPENGL_ERROR();
-  glutInitWindowSize(1024, 1024);TEST_OPENGL_ERROR();
+  glutInitWindowSize(512, 512);TEST_OPENGL_ERROR();
   glutInitWindowPosition(10, 10);TEST_OPENGL_ERROR();
   glutCreateWindow ("Test OpenGL-POGL");TEST_OPENGL_ERROR();
   glutDisplayFunc(display);TEST_OPENGL_ERROR();

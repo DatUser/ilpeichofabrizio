@@ -16,8 +16,6 @@ layout (binding=1, rgba32f) uniform image2D debug_texture;
 #define INV_FOUR_PI 	0.0795775
 #define EPSILON       1e-8
 
-float camera_pos_z = 5.0;
-
 
 // *****************************************************************************
 // *                                Utils                                      *
@@ -125,7 +123,7 @@ Material gray = Material(
 );
 
 Material red = Material(
-  vec3(1, 0, 0),
+  vec3(1, 1, 1),
   vec3(0, 0, 0)
 );
 
@@ -152,9 +150,9 @@ Triangle triangle1 = Triangle(
 );
 
 Triangle triangle2 = Triangle(
-  vec3(-15, 4, 0),
-  vec3(15, 4, 0),
-  vec3(0, 4, 10),
+  vec3(-10, 4, -10),
+  vec3(10, 4, -10),
+  vec3(0, 0, 10),
   emissive
 );
 
@@ -171,6 +169,9 @@ Triangle triangle3 = Triangle(
   vec3(5, 2, 0),
   emissive
 );
+
+float camera_pos_z = 3.0;
+
 
 Collision collisions[5];
 
@@ -356,7 +357,7 @@ Sample sample_hemisphere(vec3 n, vec2 u)
 	vec3 dr = vec3(sin(r.x) * vec2(sin(r.y), cos(r.y)), cos(r.x));
 	vec3 wi = dot(dr, n) * dr;
   
-  return Sample(wi, INV_TWO_PI);
+  return Sample(wi, INV_PI);
 }
 
 Sample cosine_sample_hemisphere(vec3 n, vec2 u)
@@ -395,7 +396,7 @@ Sample area_sample(Triangle t, vec3 origin)
   // Compute area of triangle
 
   vec3 n = cross(t.p1 - t.p0, t.p2 - t.p0);
-  float area_pdf = 2 / dot(n, n);     // 1/area : uniform sampling over area
+  float area_pdf = 2 / length(n);     // 1/area : uniform sampling over area
 
   return Sample(dir, area_pdf);
 }
@@ -410,49 +411,25 @@ vec3 uniform_sample_one_light(Collision obj_col)
   Sample light_sample = area_sample(light, obj_col.p);
   vec3 wi = light_sample.value;
 
-  // FIXME weird  
-  //if (dot(wi, obj_col.n) < 0) wi = -wi;
-  //wi += obj_col.n * 0.001;
-
-  //Ray ray_in = Ray(obj_col.p, wi);
-  Ray ray_in;
-
-  if (dot(wi, obj_col.n) < 0)
-  {
-    ray_in = Ray(obj_col.p - obj_col.n * 1e-4, normalize(wi));
-  }
-  else
-  {
-    ray_in = Ray(obj_col.p + obj_col.n * 1e-4, normalize(wi));
-  }
-
+  Ray ray_in = Ray(obj_col.p, wi);
+  ray_in.dir += obj_col.n * 1e-3 * ((dot(wi, obj_col.n) < 0) ? -1 : 1);
 
   Collision light_col = find_nearest(ray_in);
 
   // Discard if no hit or hit non emissive object 
   if (light_col.t <= 0 || light_col.mat.emission == vec3(0)) return vec3(0);
 
-  //return wi;
-
   // Evaluate the BSDF at the object's collision 
   vec3 wo = -obj_col.ray.dir;
   vec3 f = evaluate_bsdf(wo, wi, obj_col);
 
   // Convert area pdf to solid angle pdf
-  //float pdf = light_sample.pdf * (light_col.t * light_col.t) / abs(dot(light_col.n, -wi));
-  float cos1 = dot(light_col.n, wi);
-  float cos2 = dot(obj_col.n, -wi);
-  return  f * cos1 * cos2 / (light_sample.pdf * light_col.t * light_col.t);
-  //pdf = pdf / 10;
-  //return vec3(pdf);
+  // Intuition: adding distance / smaller angle from point to light -> smaller angle range on point hemisphere
+  float pdf = light_sample.pdf * (light_col.t * light_col.t) / abs(dot(light_col.n, -wi));
 
-  //if (f == vec3(0) || pdf == 0) return vec3(0);
+  if (f == vec3(0) || pdf == 0) return vec3(0);
 
-  ////return f * abs(dot(wi, obj_col.n));
-  ////return vec3(100 * light_sample.pdf);
-  
-  //return clamp(light_col.mat.emission * f * abs(dot(wi, obj_col.n)) / pdf, 0.0, 1.0);
-  //return light_col.mat.emission * f * abs(dot(wi, obj_col.n)) / pdf;
+  return light_col.mat.emission * f * abs(dot(wi, obj_col.n)) / pdf;
 }
 
 
@@ -463,7 +440,7 @@ vec3 pathtrace(Ray ray)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 4;
+  int max_bounces = 3;
   bool specular_bounce = false;
 
   for (int bounces = 0; ; bounces++)
@@ -472,11 +449,7 @@ vec3 pathtrace(Ray ray)
     Collision obj_col = find_nearest(ray);
 
     // Stop if no collision or no more bounce
-    if (obj_col.t <= 0 || bounces >= max_bounces)
-    {
-      L += throughput * vec3(0);
-      break;
-    }
+    if (obj_col.t <= 0 || bounces >= max_bounces) break;
 
     // Account for the emission if :
     //  - it is the initial collision
@@ -498,44 +471,27 @@ vec3 pathtrace(Ray ray)
 
     // Direct lighting estimation at current path vertex (end of the current path = light)
     L += throughput * uniform_sample_one_light(obj_col);
-    return L;
 
     // Sample the BSDF at intersection to get the new path direction
-    Sample bsdf_sample = sample_hemisphere(obj_col.n, vec2(rand(), rand()));
+    Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, vec2(rand(), rand()));
 
     vec3 wi = bsdf_sample.value;
     vec3 wo = -ray.dir;
     vec3 f = evaluate_bsdf(wo, wi, obj_col);
 
-    //if (bounces == 1) return vec3(bsdf_sample.pdf);
-    
-    //if (bounces == 2) return throughput * f * vec3(abs(dot(wi, obj_col.n))) / bsdf_sample.pdf;
-    //return vec3(bsdf_sample.pdf);
-    //return f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
-
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
-    //return throughput;
-    //throughput *= f * abs(dot(wi, obj_col.n)) ;
 
-    if (dot(wi, obj_col.n) < 0)
-    {
-      ray = Ray(obj_col.p - obj_col.n * 1e-4, normalize(wi));
-    }
-    else
-    {
-      ray = Ray(obj_col.p + obj_col.n * 1e-4, normalize(wi));
-    }
-    //wi += obj_col.n * 0.1;
+    ray = Ray(obj_col.p, wi);
 
-    //ray = Ray(obj_col.p , wi);
+    // Add small displacement to prevent being on the surface
+    ray.dir += obj_col.n * 1e-3 * ((dot(wi, obj_col.n) < 0) ? -1 : 1);
   }
 
-  return L;//clamp(L, 0.0, 1.0);
+  return L;
 }
 
 void main()
 {
-
   int width = int(gl_NumWorkGroups.x); // one workgroup = one invocation = one pixel
   int height = int(gl_NumWorkGroups.y);
   ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
@@ -551,7 +507,7 @@ void main()
   ray.dir = normalize(pixel_world - ray.origin);
   
   // Cast the ray out into the world and intersect the ray with objects
-  int spp = 512;
+  int spp = 32;
   vec3 res = vec3(0);
   for (int i = 0; i < spp; i++)
   {
