@@ -1,9 +1,14 @@
 #version 450
 
-layout (local_size_x = 1, local_size_x = 1) in;
+//#define DEBUG
+
+layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding=0, rgba8) uniform image2D prev_frame;
-layout (binding=1, rgba32f) uniform image2D debug_texture;
-layout (binding=2, rgba8) uniform image2D new_frame;
+layout (binding=1, rgba8) uniform image2D new_frame;
+
+#ifdef DEBUG
+layout (binding=2, rgba32f) uniform image2D debug_texture;
+#endif
 
 uniform int u_frame;
 
@@ -18,6 +23,7 @@ uniform int u_frame;
 #define INV_TWO_PI 		0.1591549
 #define INV_FOUR_PI 	0.0795775
 #define EPSILON       1e-8
+
 
 
 // *****************************************************************************
@@ -104,16 +110,42 @@ Light light = Light(vec3(0, 1, 3));
 
 Material emissive = Material(
   vec3(1, 1, 1),
-  vec3(1, 1, 1)
+  vec3(1.0, 0.9, 0.7) * 30.f
+);
+
+Material emissive2 = Material(
+  vec3(1, 1, 1),
+  vec3(1.0, 0.0, 0.0) * 5.f
 );
 
 Material gray = Material(
-  vec3(0.2, 0.2, 0.2),
+  vec3(0.7, 0.7, 0.7),
+  vec3(0, 0, 0)
+);
+
+Material light_blue = Material(
+  vec3(0.9f, 0.75f, 0.9f),
+  vec3(0, 0, 0)
+);
+
+Material pink = Material(
+  vec3(0.75f, 0.9f, 0.9f),
+  //vec3(0.9f, 0.0f, 0.5f),
+  vec3(0, 0, 0)
+);
+
+Material gold = Material(
+  vec3(0.9f, 0.9f, 0.75f),
   vec3(0, 0, 0)
 );
 
 Material red = Material(
-  vec3(1, 1, 1),
+  vec3(1, 0, 0),
+  vec3(0, 0, 0)
+);
+
+Material green = Material(
+  vec3(0, 1, 0),
   vec3(0, 0, 0)
 );
 
@@ -122,68 +154,69 @@ Material blue = Material(
   vec3(0, 0, 0)
 );
 
-Sphere sphere = Sphere(vec3(-1.5, -1.5, -2.5), 1.5, blue);
-Sphere sphere2 = Sphere(vec3(1.5, -1.5, -2.5), 1.5, red);
+Sphere sphere1 = Sphere(vec3(-3.75, -3.75, -2.5), 1.25, gold);
+Sphere sphere2 = Sphere(vec3(0, -3.75, -2.5), 1.25, light_blue);
+Sphere sphere3 = Sphere(vec3(3.75, -3.75, -2.5), 1.25, pink);
 
 Triangle floor1 = Triangle(
-  vec3(5, -5, -5),
-  vec3(-5, -5, -5),
-  vec3(5, -5, 0),
+  vec3(5.1, -5, -5),
+  vec3(-5.1, -5, -5),
+  vec3(5.1, -5, 0),
   gray
 );
 
 Triangle floor2 = Triangle(
-  vec3(-5, -5, 0),
-  vec3(5, -5, 0),
-  vec3(-5, -5, -5),
+  vec3(-5.1, -5, 0),
+  vec3(5.1, -5, 0),
+  vec3(-5.1, -5, -5),
   gray
 );
 
 Triangle ceil1 = Triangle(
-  vec3(5, 5, -5),
-  vec3(-5, 5, -5),
-  vec3(5, 5, 0),
+  vec3(-5.1, 5 + 1e-3, -5),
+  vec3(5.1, 5 + 1e-3, -5),
+  vec3(5.1, 5 + 1e-3, 0),
   gray
 );
 
 Triangle ceil2 = Triangle(
-  vec3(-5, 5, 0),
-  vec3(5, 5, 0),
-  vec3(-5, 5, -5),
+  vec3(5.1, 5 + 1e-3, 0),
+  vec3(-5.1, 5 + 1e-3, 0),
+  vec3(-5.1, 5 + 1e-3, -5),
   gray
 );
 
 Triangle left1 = Triangle(
-  vec3(-5,  5, -5),
-  vec3(-5,  -5, -5),
-  vec3(-5,  -5,  0),
-  gray
+  vec3(-5,  -5.1, -5),
+  vec3(-5,  5.1, -5),
+  vec3(-5,  -5.1,  0),
+  red
 );
 
 Triangle left2 = Triangle(
-  vec3(-5,  5, 0),
-  vec3(-5,  5, -5),
-  vec3(-5,  -5,  0),
-  gray
+  vec3(-5,  5.1, -5),
+  vec3(-5,  5.1, 0),
+  vec3(-5,  -5.1,  0),
+  red
 );
 
 Triangle right1 = Triangle(
-  vec3( 5,  5, -5),
-  vec3( 5,  -5, -5),
-  vec3( 5,  -5,  0),
-  gray
+  vec3( 5,  5.1, -5),
+  vec3( 5,  -5.1, -5),
+  vec3( 5,  -5.1,  0),
+  green
 );
 
 Triangle right2 = Triangle(
-  vec3( 5,  5, 0),
-  vec3( 5,  5, -5),
-  vec3( 5,  -5,  0),
-  gray
+  vec3( 5,  5.1, 0),
+  vec3( 5,  5.1, -5),
+  vec3( 5,  -5.1,  0),
+  green
 );
 
 Triangle back1 = Triangle(
-  vec3( 5,  -5, -5),
   vec3( -5,  -5, -5),
+  vec3( 5,  -5, -5),
   vec3(-5,  5,  -5),
   gray
 );
@@ -195,31 +228,17 @@ Triangle back2 = Triangle(
   gray
 );
 
-Triangle light2 = Triangle(
-  vec3(5, 4.9, -5),
-  vec3(-5, 4.9, -5),
-  vec3(5, 4.9, 0),
+Triangle light1 = Triangle(
+  vec3(-2.5, 5, -3.5),
+  vec3(2.5, 5, -1.5),
+  vec3(2.5, 5, -3.5),
   emissive
 );
 
-//Triangle light2 = Triangle(
-//  vec3(-2.5, 4.99, -2.5),
-//  vec3(2.5, 4.99, -2.5),
-//  vec3(0, 4.99, 2.5),
-//  emissive
-//);
-
-//Triangle triangle2 = Triangle(
-//  vec3(5, 2, -5),
-//  vec3(5, 2, 0),
-//  vec3(-5, 2, -5),
-//  emissive
-//);
-
-Triangle triangle3 = Triangle(
-  vec3(-5, 2, 0),
-  vec3(-5, 2, -5),
-  vec3(5, 2, 0),
+Triangle light2 = Triangle(
+  vec3(-2.5, 5, -3.5),
+  vec3(2.5, 5, -1.5),
+  vec3(-2.5, 5, -1.5),
   emissive
 );
 
@@ -376,19 +395,21 @@ Collision collision(Triangle triangle, Ray ray)
 Collision intersect_scene(Ray ray)
 {
   int n = 0;
-  collisions[n] = collision(sphere, ray); n++;
+  collisions[n] = collision(sphere1, ray); n++;
+  collisions[n] = collision(sphere2, ray); n++;
+  collisions[n] = collision(sphere3, ray); n++;
   collisions[n] = collision(floor1, ray); n++;
   collisions[n] = collision(floor2, ray); n++;
-  //collisions[n] = collision(ceil1, ray); n++;
-  //collisions[n] = collision(ceil2, ray); n++;
+  collisions[n] = collision(ceil1, ray); n++;
+  collisions[n] = collision(ceil2, ray); n++;
   collisions[n] = collision(left1, ray); n++;
   collisions[n] = collision(left2, ray); n++;
   collisions[n] = collision(right1, ray); n++;
   collisions[n] = collision(right2, ray); n++;
   collisions[n] = collision(back1, ray); n++;
   collisions[n] = collision(back2, ray); n++;
+  collisions[n] = collision(light1, ray); n++;
   collisions[n] = collision(light2, ray); n++;
-  collisions[n] = collision(sphere2, ray); n++;
 
   float infinity = 1.0 / 0.0;
   float min_val = infinity;
@@ -437,6 +458,7 @@ Sample cosine_sample_hemisphere(vec3 n, vec2 u)
 // This is the lambert one only for now
 vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
+  //return obj_col.mat.diffusivity;
   return obj_col.mat.diffusivity * INV_PI;
 }
 
@@ -469,25 +491,24 @@ Sample area_sample(Triangle t, vec3 origin)
 vec3 uniform_sample_one_light(Collision obj_col)
 {
   // TODO: pick random light
-  Triangle light = light2;
+  Triangle light = RandomFloat01(rngState) > 0.5 ? light1 : light2;
 
   // Sample a ray direction from light to collision point
   Sample light_sample = area_sample(light, obj_col.p);
   vec3 wi = light_sample.value;
 
+
   // Add small displacement to prevent being on the surface
   Ray ray_in = Ray(
-    obj_col.p + obj_col.n * 1.0e-3 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
+    obj_col.p + obj_col.n * 1.0e-2 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
     wi
   );
 
   Collision light_col = intersect_scene(ray_in);
 
-
-  //return wi;
   // Discard if no hit or hit non emissive object 
   if (light_col.t <= 0 || light_col.mat.emission == vec3(0)) return vec3(0);
-
+  
   // Evaluate the BSDF at the object's collision 
   vec3 wo = -obj_col.ray.dir;
   vec3 f = evaluate_bsdf(wo, wi, obj_col);
@@ -509,7 +530,7 @@ vec3 pathtrace(Ray ray)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 3;
+  int max_bounces = 2;
   bool specular_bounce = false;
 
   for (int bounces = 0; ; bounces++)
@@ -518,7 +539,11 @@ vec3 pathtrace(Ray ray)
     Collision obj_col = intersect_scene(ray);
 
     // Stop if no collision or no more bounce
-    if (obj_col.t <= 0 || bounces >= max_bounces) break;
+    if (obj_col.t <= 0 || bounces >= max_bounces)
+    {
+      L += throughput * vec3(0.05);
+      break;
+    }
 
     // Account for the emission if :
     //  - it is the initial collision
@@ -539,7 +564,8 @@ vec3 pathtrace(Ray ray)
     // TODO: Compute scattering functions and skip over medium boundaries
 
     // Direct lighting estimation at current path vertex (end of the current path = light)
-    L += throughput * 4 * uniform_sample_one_light(obj_col);
+    L += throughput * uniform_sample_one_light(obj_col);
+    //L += throughput * obj_col.mat.emission;
     //return L;
 
     // Sample the BSDF at intersection to get the new path direction
@@ -552,12 +578,22 @@ vec3 pathtrace(Ray ray)
 
     // Update how much light will receive from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
+    //throughput *= f / bsdf_sample.pdf;
 
     // Add small displacement to prevent being on the surface
     ray = Ray(
-      obj_col.p + obj_col.n * 1.0e-3 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
+      obj_col.p + obj_col.n * 1.0e-2 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
       wi
     );
+
+    {
+      float p = max(throughput.r, max(throughput.g, throughput.b));
+      if (RandomFloat01(rngState) > p)
+          break;
+
+      // Add the energy we 'lose' by randomly terminating paths
+      throughput *= 1.0f / p;            
+    }
 
   }
 
@@ -572,6 +608,8 @@ void main()
 
   int width = int(gl_NumWorkGroups.x); // one workgroup = one invocation = one pixel
   int height = int(gl_NumWorkGroups.y);
+  width = 1024;
+  height = 1024;
   ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
   
   // Convert this pixel's screen space location to world space
@@ -601,5 +639,8 @@ void main()
   );
 
   imageStore(new_frame, pixel, vec4(acc_color.xyz, 1.0));
+
+  #ifdef DEBUG
   imageStore(debug_texture, pixel, vec4(res, 1.0));
+  #endif
 }
