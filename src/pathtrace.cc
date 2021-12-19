@@ -23,6 +23,8 @@
 #include "program.hh"
 #include "sphere.hh"
 
+//#define DEBUG
+
 #define TEST_OPENGL_ERROR()                                                             \
   do {                                                                                  \
     GLenum err = glGetError();                                                          \
@@ -38,11 +40,11 @@
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
 
-int width = 512;
-int height = 512;
+int width = 1024;
+int height = 1024;
 
-int workGroupsX = width;
-int workGroupsY = height;
+int workGroupsX = width / 16;
+int workGroupsY = height / 16;
 int workGroupsZ = 1;
 
 GLuint textures[3]; // The texture ID of the full screen texture
@@ -66,30 +68,22 @@ void display()
   // PHASE 1 : Path tracing compute shader
   pathtrace_shader->use();
 
-  std::cout << frame << std::endl;
+  //std::cout << frame << std::endl;
   GLint uniform_frame_id;
   std::string name = "u_frame";
   uniform_frame_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
   glUniform1i(uniform_frame_id, frame);TEST_OPENGL_ERROR();
   frame++;
 
-  int i, j;
-  if (frame % 2)
-  {
-    i = 0;
-    j = 2;
-  }
-  else
-  {
-    i = 2;
-    j = 0;
-  }
-
-  std::cout << i << " " << j << std::endl; 
+  int i = frame % 2 == 0;
+  int j = i == 0;
 
   glBindImageTexture(0, textures[i], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);               // prev frame
-  glBindImageTexture(1, textures[1], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);            // debug texture
-  glBindImageTexture(2, textures[j], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);              // new frame
+  glBindImageTexture(1, textures[j], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);              // new frame
+
+  #ifdef DEBUG
+  glBindImageTexture(2, textures[2], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);            // debug texture
+  #endif
 
   glDispatchCompute(workGroupsX, workGroupsY, workGroupsZ);
   glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -122,7 +116,8 @@ bool initGlut(int &argc, char* argv[])
   glutInitContextVersion(4, 5);TEST_OPENGL_ERROR();
   glutInitContextProfile(GLUT_CORE_PROFILE|GLUT_DEBUG);TEST_OPENGL_ERROR();
   glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);TEST_OPENGL_ERROR();
-  glutInitWindowSize(width, height);TEST_OPENGL_ERROR();
+  //glutInitWindowSize(width, height);TEST_OPENGL_ERROR();
+  glutInitWindowSize(1024, 1024);TEST_OPENGL_ERROR();
   glutInitWindowPosition(10, 10);TEST_OPENGL_ERROR();
   glutCreateWindow ("Test OpenGL-POGL");TEST_OPENGL_ERROR();
   glutDisplayFunc(display);TEST_OPENGL_ERROR();
@@ -132,8 +127,8 @@ bool initGlut(int &argc, char* argv[])
 
 void init()
 {
-  glEnable(GL_DEPTH_TEST);TEST_OPENGL_ERROR();
-  glDepthFunc(GL_LESS);TEST_OPENGL_ERROR();
+  //glEnable(GL_DEPTH_TEST);TEST_OPENGL_ERROR();
+  //glDepthFunc(GL_LESS);TEST_OPENGL_ERROR();
 }
 
 //void timer(int value) {
@@ -179,14 +174,6 @@ int main(int argc, char** argv)
   // Create the OpenGL Texture on which to ray cast the scene
   glGenTextures(3, textures);
 
-  debugTexture = (float*)malloc(sizeof(float) * 4 * width * height);
-  memset(debugTexture, 0, sizeof(float) * 4 * width * height);
-
-  glBindTexture(GL_TEXTURE_2D, textures[1]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, (const void *)debugTexture);
-
   prevFrameTexture = (unsigned char*)malloc(sizeof(unsigned char) * 4 * width * height);
   memset(prevFrameTexture, 0, sizeof(char) * 4 * width * height);
   for (int i = 0; i < height; i++) {
@@ -207,10 +194,20 @@ int main(int argc, char** argv)
   newFrameTexture = (unsigned char*)malloc(sizeof(unsigned char) * 4 * width * height);
   memset(newFrameTexture, 0, sizeof(char) * 4 * width * height);
 
-  glBindTexture(GL_TEXTURE_2D, textures[2]);
+  glBindTexture(GL_TEXTURE_2D, textures[1]);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void *)newFrameTexture);
+
+  #ifdef DEBUG
+  debugTexture = (float*)malloc(sizeof(float) * 4 * width * height);
+  memset(debugTexture, 0, sizeof(float) * 4 * width * height);
+
+  glBindTexture(GL_TEXTURE_2D, textures[2]);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, (const void *)debugTexture);
+  #endif
 
   glGenVertexArrays(1, vao); TEST_OPENGL_ERROR();
   glGenBuffers(numVBOs, vbo); TEST_OPENGL_ERROR();
