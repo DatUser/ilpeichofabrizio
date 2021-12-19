@@ -14,8 +14,9 @@ uniform int u_frame;
 
 
 // *****************************************************************************
-// *                              Constants                                    *
+// *                              CONSTANTS                                    *
 // *****************************************************************************
+
 #define PI 					  3.1415926
 #define TWO_PI 				6.2831852
 #define FOUR_PI 			12.566370
@@ -25,30 +26,8 @@ uniform int u_frame;
 #define EPSILON       1e-8
 
 
-
 // *****************************************************************************
-// *                                Utils                                      *
-// *****************************************************************************
-
-uint rngState;
-
-uint wang_hash(inout uint seed)
-{
-    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
-    seed *= uint(9);
-    seed = seed ^ (seed >> 4);
-    seed *= uint(0x27d4eb2d);
-    seed = seed ^ (seed >> 15);
-    return seed;
-}
-
-float RandomFloat01(inout uint state)
-{
-    return float(wang_hash(state)) / 4294967296.0;
-}
-
-// *****************************************************************************
-// *                                Structs                                    *
+// *                                STRUCTS                                    *
 // *****************************************************************************
 
 struct Ray
@@ -64,8 +43,9 @@ struct Light
 
 struct Material
 {
-  vec3 diffusivity;
+  vec3 albedo;
   vec3 emission;
+  bool is_microfacet;
 };
 
 
@@ -103,7 +83,7 @@ struct Sample
 
 
 // *****************************************************************************
-// *                                 Scene                                     *
+// *                                 SCENE                                     *
 // *****************************************************************************
 
 Light light = Light(vec3(0, 1, 3));
@@ -130,7 +110,6 @@ Material light_blue = Material(
 
 Material pink = Material(
   vec3(0.75f, 0.9f, 0.9f),
-  //vec3(0.9f, 0.0f, 0.5f),
   vec3(0, 0, 0)
 );
 
@@ -140,17 +119,17 @@ Material gold = Material(
 );
 
 Material red = Material(
-  vec3(1, 0, 0),
+  vec3(0.7f, 0.1f, 0.1f),
   vec3(0, 0, 0)
 );
 
 Material green = Material(
-  vec3(0, 1, 0),
+  vec3(0.1f, 0.7f, 0.1f),
   vec3(0, 0, 0)
 );
 
 Material blue = Material(
-  vec3(0, 0, 1),
+  vec3(0.1f, 0.1f, 0.7f),
   vec3(0, 0, 0)
 );
 
@@ -251,12 +230,25 @@ vec3 ambient = vec3(0.05, 0.05, 0.05);
 
 
 // *****************************************************************************
-// *                              Functions                                    *
+// *                                 UTILS                                     *
 // *****************************************************************************
 
+uint rngState;
 
-// UTILS
+uint wang_hash(inout uint seed)
+{
+    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
+    seed *= uint(9);
+    seed = seed ^ (seed >> 4);
+    seed *= uint(0x27d4eb2d);
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
 
+float RandomFloat01(inout uint state)
+{
+    return float(wang_hash(state)) / 4294967296.0;
+}
 vec3 local_to_world(vec3 local_dir, vec3 normal)
 {
   vec3 binormal = normalize(
@@ -284,7 +276,9 @@ vec3 spherical_to_cartesian(float rho, float phi, float theta)
 }
 
 
-// Collisions
+// *****************************************************************************
+// *                             COLLISIONS                                    *
+// *****************************************************************************
 
 // Adapted from scratchapixel's sphere collision 
 Collision collision(Sphere sphere, Ray ray)
@@ -427,7 +421,9 @@ Collision intersect_scene(Ray ray)
 }
 
 
-// BSDF SAMPLING
+// *****************************************************************************
+// *                                 BSDF                                      *
+// *****************************************************************************
 
 Sample sample_hemisphere(vec3 n, vec2 u)
 {
@@ -456,14 +452,97 @@ Sample cosine_sample_hemisphere(vec3 n, vec2 u)
 }
 
 // This is the lambert one only for now
+vec3 evaluate_lambert_bsdf(vec3 wo, vec3 wi, Collision obj_col)
+{
+  //return obj_col.mat.albedo;
+  return obj_col.mat.albedo * INV_PI;
+}
+
+vec3 f0 = vec3(0.04); //Pre-computed (default is water value)
+float roughness = 0.1;
+float metalness = 1.0 ;// = 0.1;//1 if metallic 0 otherwise
+float lightPower = 4.0;
+
+// Use dotNH for microdetails
+vec3 fresnelSchlick(float dotHV, vec3 albedo)
+{
+  //vec3 F0 = f0;
+  vec3 F0 = mix(f0, albedo, metalness);
+  vec3 f90 = vec3(1.0);//Pre-computed (here we use water value)
+  return F0 + (f90 - F0) * pow(1.0 - dotHV, 5.0);
+}
+
+float distribGGX(float dotNH, float alpha2)
+{
+  float dotNH2 = pow(dotNH, 2.0);
+  float bot = dotNH2 * (alpha2 - 1.0) + 1.0;
+  return alpha2 / (PI * bot * bot + EPSILON);
+}
+
+float geometrySmith(float dotNV, float dotNL, float alpha2)
+{
+  float kdirect = pow(roughness + 1.0, 2.0) / 8.0;
+  float kIBL = alpha2 / 2.0;
+  float k = kdirect;
+  float Gobstruction = dotNV / (dotNV * (1.0 - k) + k);
+  float Gshadowing = dotNL / (dotNL * (1.0 - k) + k);
+  return Gshadowing * Gobstruction;
+}
+
+vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
+{
+  //temporary
+  vec3 lightPos = vec3(0.0, 3.0, 3.0);
+  vec3 lightColor = vec3(1.0, 1.0, 1.0);
+
+  //bissector of v and lightdir
+  vec3 h = normalize(wi + wo);
+
+  //Storing results
+  float dotNV = max(abs(dot(obj_col.n, wo)), 0.0);
+  float dotNL = max(dot(obj_col.n, wi), 0.0);
+  float dotVN = max(dot(wo, obj_col.n), 0.0);
+  float dotNH = max(dot(obj_col.n, h), 0.0);
+  float dotLH = max(dot(wi, h), 0.0);
+  float dotVH = max(dot(wo, h), 0.0);
+  float alpha = roughness * roughness;
+  float alpha2 = alpha * alpha;
+
+  //Calculating Normal Distribution
+  float nDistrib = distribGGX(dotNH, alpha2);
+
+  //Calculate Schlick Fresnel approximation
+  //Represents ks
+  vec3 nFresnel = fresnelSchlick(dotLH, obj_col.mat.albedo); 
+
+  //Calculate Smith GGX 
+  float nGeometric = geometrySmith(dotNV, dotNL, alpha2);
+
+  //Computing Cook-Torrance GGX model
+  vec3 specular = (nDistrib * nFresnel * nGeometric) /
+    (4.0 * dotNV * dotNL + EPSILON);
+
+  //Computing diffuse Lambert
+  vec3 kd = vec3(1.0);
+  kd = (kd - nFresnel) * (1.0 - metalness);
+  vec3 diffuse = kd * obj_col.mat.albedo / PI;
+
+  vec3 color = (diffuse + specular) *  dotNL;
+  color = color / (color + vec3(1.0));
+  color = pow(color, vec3(1.0 / 2.2));
+
+  return color;
+}
+
 vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
-  //return obj_col.mat.diffusivity;
-  return obj_col.mat.diffusivity * INV_PI;
+  return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
 }
 
 
-// LIGHT SAMPLING
+// *****************************************************************************
+// *                               LIGHTS                                      *
+// *****************************************************************************
 
 vec2 uniform_sample_triangle(vec2 u)
 {
@@ -523,14 +602,16 @@ vec3 uniform_sample_one_light(Collision obj_col)
 }
 
 
-// MAIN FUNCTIONS
+// *****************************************************************************
+// *                               MAIN                                        *
+// *****************************************************************************
 
 vec3 pathtrace(Ray ray)
 {
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 2;
+  int max_bounces = 8;
   bool specular_bounce = false;
 
   for (int bounces = 0; ; bounces++)
@@ -565,8 +646,6 @@ vec3 pathtrace(Ray ray)
 
     // Direct lighting estimation at current path vertex (end of the current path = light)
     L += throughput * uniform_sample_one_light(obj_col);
-    //L += throughput * obj_col.mat.emission;
-    //return L;
 
     // Sample the BSDF at intersection to get the new path direction
     vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
@@ -578,7 +657,6 @@ vec3 pathtrace(Ray ray)
 
     // Update how much light will receive from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
-    //throughput *= f / bsdf_sample.pdf;
 
     // Add small displacement to prevent being on the surface
     ray = Ray(
