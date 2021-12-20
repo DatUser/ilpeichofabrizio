@@ -128,7 +128,7 @@ main()
   color = pow(color, vec3(1.0 / 2.2));
 
   // **DO NOT** forget to apply gamma correction as last step.
-  outFragColor.rgba = vec4(/*color*/vec3(uv.y, 0.0, 0.0), 1.0);
+  outFragColor.rgba = vec4(/*color*/vec3(uv.x, 0.0, 0.0), 1.0);
   //outFragColor.rgba = LinearTosRGB(vec4(diffuse, 1.0));
   //outFragColor.rgba = vec4(vec3(dotVH), 1.0);
   //outFragColor.rgba = vec4(vec3(dotNV), 1.0);

@@ -19,48 +19,41 @@
 #include "../bindings/imgui_impl_opengl3.h"
 #include "../bindings/imgui_impl_glut.h"
 
+#include "../SOIL2/src/SOIL2/SOIL2.h"
+
 #include "program.hh"
 #include "sphere.hh"
 
-#define TEST_OPENGL_ERROR()                                                             \
-  do {                                                                                  \
-    GLenum err = glGetError();                                                          \
-    if (err != GL_NO_ERROR) std::cerr << "OpenGL ERROR: "                               \
-                                      << gluErrorString(err)                            \
-                                      << " file " << __FILE__                           \
-                                      << " line " << __LINE__ << std::endl;             \
-  } while(0)
+//std::vector<float> vertices;
+//std::vector<unsigned int> indices;
+//std::vector<float> tex;
+Mesh* mesh;
 
-
-std::vector<float> vertices;
-std::vector<unsigned int> indices;
-
+GLuint VBOs[3];
 GLuint VBO;
 GLuint VAO;
 GLuint EBO;
+GLuint TBO;
+GLuint aoTex;
+GLuint colorTex;
+GLuint metalTex;
+GLuint roughTex;
 
 glm::vec2 start_pos;
 glm::vec2 end_pos;
 
-program* instance; 
+program* instance;
+float anim_time = 0.0;
 
-void display()
+void set_ui()
 {
-  ImGui_ImplOpenGL3_NewFrame();
-  ImGui_ImplGLUT_NewFrame();
-
-  glClearColor(0.45, 0.6, 0.99, 1.0);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
-  //glMatrixMode(GL_MODELVIEW);TEST_OPENGL_ERROR();
-  //glLoadIdentity();TEST_OPENGL_ERROR();
-  //
-  //ImGui::NewFrame();
-
-  ImGui::Begin("Parameters");
-
   static glm::vec3 color(1.0, 1.0, 1.0);
   ImGui::ColorEdit3("color", &color[0]);
   instance->set_vec3("albedo", color);TEST_OPENGL_ERROR();
+
+  static glm::vec3 f0(0.04);//default water value
+  ImGui::ColorEdit3("f0", &f0[0]);
+  instance->set_vec3("f0", f0);TEST_OPENGL_ERROR();
 
   static float roughness = 0.0;
   ImGui::SliderFloat("roughness", &roughness, 0.00, 1.0);
@@ -70,16 +63,69 @@ void display()
   ImGui::SliderFloat("metalness", &metalness, 0.00, 1.0);
   instance->set_float("metalness", metalness);
 
-  glBindVertexArray(VAO);TEST_OPENGL_ERROR();
+  static float ao = 1.0;
+  ImGui::SliderFloat("Ambient Occlusion", &ao, 0.00, 1.0);
+  instance->set_float("a_occlusion", ao);
+}
+
+void display()
+{
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGLUT_NewFrame();
+
+  glClearColor(0.45, 0.6, 0.99, 1.0);TEST_OPENGL_ERROR();
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
+  //glMatrixMode(GL_MODELVIEW);TEST_OPENGL_ERROR();
+  //glLoadIdentity();TEST_OPENGL_ERROR();
+  //
+  //ImGui::NewFrame();
+  /*if (anim_time > 2.0)
+  {
+    glm::vec3 camPos = glm::vec3(4.0f, 0.0f, 0.0f);
+    glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 camFront = glm::vec3(-1.0f, 0.0f, 0.0f);
+    instance->set_vec3("cameraPos", camPos);
+    glm::mat4 view = glm::lookAt(camPos, camPos + camFront, camUp);
+    instance->set_matrix4("view", view);
+  }
+  if (anim_time > 4.0)
+  {
+    glm::vec3 camPos = glm::vec3(0.0f, 0.0f, -4.0f);
+    glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 camFront = glm::vec3(0.0f, 0.0f, 1.0f);
+    instance->set_vec3("cameraPos", camPos);
+    glm::mat4 view = glm::lookAt(camPos, camPos + camFront, camUp);
+    instance->set_matrix4("view", view);
+  }
+  if (anim_time > 6.0)
+  {
+    glm::vec3 camPos = glm::vec3(-4.0f, 0.0f, 0.0f);
+    glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 camFront = glm::vec3(1.0f, 0.0f, 0.0f);
+    instance->set_vec3("cameraPos", camPos);
+    glm::mat4 view = glm::lookAt(camPos, camPos + camFront, camUp);
+    instance->set_matrix4("view", view);
+  }*/
+
+  ImGui::Begin("Parameters");
+
+  set_ui();
+
+  //glActiveTexture(GL_TEXTURE0);
+  //glBindTexture(GL_TEXTURE_2D, colorTex);
+
+  mesh->render();
+  /*glBindVertexArray(VAO);TEST_OPENGL_ERROR();
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);TEST_OPENGL_ERROR();
   glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);TEST_OPENGL_ERROR();
-  glBindVertexArray(0);TEST_OPENGL_ERROR();
+  glBindVertexArray(0);TEST_OPENGL_ERROR();*/
 
   ImGui::End();
 
   ImGui::Render();
-	//ImGuiIO& io = ImGui::GetIO();
-	//glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+  //glLoadIdentity();
 
   glutSwapBuffers(); TEST_OPENGL_ERROR();
   glutPostRedisplay(); TEST_OPENGL_ERROR();
@@ -116,37 +162,49 @@ void init()
 }
 
 void init_vbo(program* instance)
-{if (!instance) return;
+{
+  if (!instance) return;
+
   glm::vec3 center(0, 0, 0);
   Sphere s(center, 1);
 
   auto data = s.generate_vertices(500, 500);
-  vertices = data.first;
-  indices = data.second;
+  auto vertices = data.first;
+  auto indices = data.second;
+  //tex = s.get_tex();
 
+  mesh = new Mesh(vertices, indices);
+  mesh->attach_shader(instance);
+  mesh->init_mesh();
+  /*
   glGenVertexArrays(1, &VAO); TEST_OPENGL_ERROR();
-  glGenBuffers(1, &VBO); TEST_OPENGL_ERROR();
-  glGenBuffers(1, &EBO); TEST_OPENGL_ERROR();
+  glGenBuffers(3, VBOs); TEST_OPENGL_ERROR();
+  //glGenBuffers(1, &EBO); TEST_OPENGL_ERROR();
+  //glGenBuffers(1, &TBO); TEST_OPENGL_ERROR();
 
   glBindVertexArray(VAO); TEST_OPENGL_ERROR();
-  glBindBuffer(GL_ARRAY_BUFFER, VBO); TEST_OPENGL_ERROR();
-  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);   TEST_OPENGL_ERROR();
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO); TEST_OPENGL_ERROR();
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), 
-               &indices[0], GL_STATIC_DRAW); TEST_OPENGL_ERROR();
 
   // Vertex pos
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-      6 * sizeof(float), (void*)0); TEST_OPENGL_ERROR();
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]); TEST_OPENGL_ERROR();
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);   TEST_OPENGL_ERROR();
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0); TEST_OPENGL_ERROR();
   glEnableVertexAttribArray(0); TEST_OPENGL_ERROR();
 
   // Vertex normal
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 
-      (void*)(3 * sizeof(float)));TEST_OPENGL_ERROR();
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[1]); TEST_OPENGL_ERROR();
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), 
+               &indices[0], GL_STATIC_DRAW); TEST_OPENGL_ERROR();
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);TEST_OPENGL_ERROR();
   glEnableVertexAttribArray(1); TEST_OPENGL_ERROR();
 
-  glBindVertexArray(0);
+  // Vertex tex coords
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);TEST_OPENGL_ERROR();
+  glBufferData(GL_ARRAY_BUFFER, tex.size() * sizeof(float), &tex[0], GL_STATIC_DRAW);
+  TEST_OPENGL_ERROR();
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0); TEST_OPENGL_ERROR();
+  glEnableVertexAttribArray(2);
+
+  glBindVertexArray(0);*/
 }
 
 void mouseFunc(int glut_button, int state, int x, int y)
@@ -212,15 +270,70 @@ void init_uniform(program* instance)
   glm::mat4 model = glm::mat4(1.0f);
   glm::mat4 view = glm::lookAt(camPos, camPos + camFront, camUp);
 
-  glm::mat4 locToProj = proj * view * model;
+  //glm::mat4 modelView = model * view;
+  //glm::mat4 projection = proj;
 
-  GLint projection_location =
-    glGetUniformLocation(instance->get_id(), "localToProjection");TEST_OPENGL_ERROR();
-  glUniformMatrix4fv(projection_location, 1, GL_FALSE, &locToProj[0][0]);
-  TEST_OPENGL_ERROR();
+  instance->set_matrix4("model", model);
+  instance->set_matrix4("view", view);
+  instance->set_matrix4("projection", proj);
 }
 
+void load_texture(GLuint* id, const char* filename)
+{
+  *id = SOIL_load_OGL_texture(filename, SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID,
+                                SOIL_FLAG_MIPMAPS);
+  
+  if (!*id)
+    std::cout << "Could not load " << filename << std::endl;
+  
+  glBindTexture(GL_TEXTURE_2D, *id);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  /*colorTex = SOIL_load_OGL_texture("../resources/metal/color.jpg", SOIL_LOAD_RGB,
+                                SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
+  metalTex = SOIL_load_OGL_texture("../resources/metal/metal.jpg", SOIL_LOAD_RGB,
+                                SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
+  roughTex = SOIL_load_OGL_texture("../resources/metal/rough.jpg", SOIL_LOAD_RGB,
+                                SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);*/
+}
 
+void anim() {
+  GLint anim_time_location;
+  anim_time_location = glGetUniformLocation(instance->get_id(), "time");TEST_OPENGL_ERROR();
+  glUniform1f(anim_time_location, anim_time);TEST_OPENGL_ERROR();
+  anim_time += 0.1;
+  glutPostRedisplay();
+}
+
+void timer(int value) {
+  (void) value;
+  anim();
+  glutTimerFunc(33, timer, 0);
+}
+
+void init_anim() {
+  glutTimerFunc(33, timer, 0);
+}
+
+void display_compute()
+{
+  int wk_grp_cnt[3];
+  int wk_grp_siz[3];
+  int wk_grp_inv;
+
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &wk_grp_cnt[0]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &wk_grp_cnt[1]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &wk_grp_cnt[2]);
+
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wk_grp_siz[0]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wk_grp_siz[1]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wk_grp_siz[2]);
+
+  glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wk_grp_inv);
+
+  printf("max num of wk gps: %i %i %i\n", wk_grp_cnt[0], wk_grp_cnt[1], wk_grp_cnt[2]);
+  printf("max siz of wk gps: %i %i %i\n", wk_grp_siz[0], wk_grp_siz[1], wk_grp_siz[2]);
+  printf("max local wk gps inv: %i\n", wk_grp_inv);
+}
 
 int main(int argc, char** argv)
 {
@@ -249,6 +362,8 @@ int main(int argc, char** argv)
 
   init_vbo(instance);
   init_uniform(instance);
+  load_texture(&colorTex, "../resources/metal/color.jpg");
+  init_anim();
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();

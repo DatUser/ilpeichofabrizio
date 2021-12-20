@@ -20,6 +20,8 @@ conan_basic_setup()
 file(GLOB_RECURSE SRC "src/*.cc")
 file(GLOB_RECURSE BINDINGS "bindings/*.cpp")
 
+find_library(SOIL2 SOIL2 REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 
 if (UNIX)
@@ -36,3 +38,5 @@ target_sources(main PRIVATE "src/main.cc" ${SRC} ${BINDINGS})
 target_compile_definitions(main PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLEW)
 
 conan_target_link_libraries(main)
+
+target_link_libraries(main ${SOIL2})
