@@ -90,47 +90,62 @@ Light light = Light(vec3(0, 1, 3));
 
 Material emissive = Material(
   vec3(1, 1, 1),
-  vec3(1.0, 0.9, 0.7) * 30.f
+  vec3(1.0, 0.9, 0.7) * 30.f,
+  false
 );
 
 Material emissive2 = Material(
   vec3(1, 1, 1),
-  vec3(1.0, 0.0, 0.0) * 5.f
+  vec3(1.0, 0.0, 0.0) * 5.f,
+  false
 );
 
 Material gray = Material(
   vec3(0.7, 0.7, 0.7),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  false
 );
 
 Material light_blue = Material(
   vec3(0.9f, 0.75f, 0.9f),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  false
 );
 
 Material pink = Material(
+  vec3(0.955008, 0.637427, 0.538163),
+  vec3(0, 0, 0),
+  true 
+);
+
+Material pink2 = Material(
   vec3(0.75f, 0.9f, 0.9f),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  true 
 );
 
 Material gold = Material(
   vec3(0.9f, 0.9f, 0.75f),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  false
 );
 
 Material red = Material(
   vec3(0.7f, 0.1f, 0.1f),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  false
 );
 
 Material green = Material(
   vec3(0.1f, 0.7f, 0.1f),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  false
 );
 
 Material blue = Material(
   vec3(0.1f, 0.1f, 0.7f),
-  vec3(0, 0, 0)
+  vec3(0, 0, 0),
+  false
 );
 
 Sphere sphere1 = Sphere(vec3(-3.75, -3.75, -2.5), 1.25, gold);
@@ -458,10 +473,10 @@ vec3 evaluate_lambert_bsdf(vec3 wo, vec3 wi, Collision obj_col)
   return obj_col.mat.albedo * INV_PI;
 }
 
-vec3 f0 = vec3(0.04); //Pre-computed (default is water value)
-float roughness = 0.1;
-float metalness = 1.0 ;// = 0.1;//1 if metallic 0 otherwise
-float lightPower = 4.0;
+vec3 f0 = vec3(1.00, 0.71, 0.29); //Pre-computed (default is water value)
+//vec3 f0 = vec3(0.05);
+float roughness = 0.05;
+float metalness = 1.0;// = 0.1;//1 if metallic 0 otherwise
 
 // Use dotNH for microdetails
 vec3 fresnelSchlick(float dotHV, vec3 albedo)
@@ -527,7 +542,7 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
   kd = (kd - nFresnel) * (1.0 - metalness);
   vec3 diffuse = kd * obj_col.mat.albedo / PI;
 
-  vec3 color = (diffuse + specular) *  dotNL;
+  vec3 color = (diffuse + specular) * dotNL;
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(1.0 / 2.2));
 
@@ -536,7 +551,10 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 
 vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
-  return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
+  if (obj_col.mat.is_microfacet)
+    return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
+  else
+    return evaluate_lambert_bsdf(wo, wi, obj_col);
 }
 
 
@@ -626,9 +644,10 @@ vec3 pathtrace(Ray ray)
       break;
     }
 
-    // Account for the emission if :
+    // Account for the emission only if :
     //  - it is the initial collision
     //  - previous was specular BSDF so no direct illumination estimate (Dirac distribution) 
+    // Other cases are handled by direct lighting estimation
     if (bounces == 0 || specular_bounce)
     {
       if (obj_col.t > 0)
@@ -647,6 +666,8 @@ vec3 pathtrace(Ray ray)
     // Direct lighting estimation at current path vertex (end of the current path = light)
     L += throughput * uniform_sample_one_light(obj_col);
 
+    // Indirect lighting estimation
+
     // Sample the BSDF at intersection to get the new path direction
     vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
     Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, u);
@@ -655,7 +676,7 @@ vec3 pathtrace(Ray ray)
     vec3 wo = -ray.dir;
     vec3 f = evaluate_bsdf(wo, wi, obj_col);
 
-    // Update how much light will receive from next path vertex
+    // Update how much light is received from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
 
     // Add small displacement to prevent being on the surface
@@ -664,14 +685,13 @@ vec3 pathtrace(Ray ray)
       wi
     );
 
-    {
-      float p = max(throughput.r, max(throughput.g, throughput.b));
-      if (RandomFloat01(rngState) > p)
-          break;
+    // Russian roulette : save computing resources by terminating paths in an unbiased way
+    float p = max(throughput.r, max(throughput.g, throughput.b));
+    if (RandomFloat01(rngState) > p)
+        break;
 
-      // Add the energy we 'lose' by randomly terminating paths
-      throughput *= 1.0f / p;            
-    }
+    // Add the energy we 'lose' by randomly terminating paths
+    throughput *= 1.0f / p;            
 
   }
 

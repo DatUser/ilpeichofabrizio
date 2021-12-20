@@ -59,6 +59,7 @@ GLint frame = 0;
 float anim_time = 0.0;
 
 
+
 void display()
 {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
