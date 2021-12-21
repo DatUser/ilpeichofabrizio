@@ -1,4 +1,5 @@
-
+set(CMAKE_C_COMPILER /usr/bin/clang CACHE PATH "")
+set(CMAKE_CXX_COMPILER /usr/bin/clang++ CACHE PATH "")
 # SETUP
 cmake_minimum_required(VERSION 3.12)
 project(main)

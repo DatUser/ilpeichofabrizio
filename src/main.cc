@@ -23,6 +23,7 @@
 
 #include "program.hh"
 #include "sphere.hh"
+#include "objloader.hh"
 
 //std::vector<float> vertices;
 //std::vector<unsigned int> indices;
@@ -109,7 +110,7 @@ void display()
 
   ImGui::Begin("Parameters");
 
-  set_ui();
+  //set_ui();
 
   //glActiveTexture(GL_TEXTURE0);
   //glBindTexture(GL_TEXTURE_2D, colorTex);
@@ -163,17 +164,20 @@ void init()
 
 void init_vbo(program* instance)
 {
-  if (!instance) return;
+  //if (!instance) return;
 
-  glm::vec3 center(0, 0, 0);
+  /*glm::vec3 center(0, 0, 0);
   Sphere s(center, 1);
 
   auto data = s.generate_vertices(500, 500);
   auto vertices = data.first;
-  auto indices = data.second;
+  auto indices = data.second;*/
   //tex = s.get_tex();
 
-  mesh = new Mesh(vertices, indices);
+  //mesh = new Mesh(vertices, indices);
+  (void) instance;
+  std::string filename = "../resources/deer.obj";
+  mesh = load_obj(filename)[0];
   mesh->attach_shader(instance);
   mesh->init_mesh();
   /*
@@ -346,23 +350,28 @@ int main(int argc, char** argv)
 
   init();
 
-  //std::string file_f("../src/shaders/test.frag.glsl");
-  std::string file_v("../src/shaders/pbr.vert.glsl");
-  std::string file_f("../src/shaders/pbr.frag.glsl");
+  std::string file_v("../src/shaders/test.vert.glsl");
+  std::string file_f("../src/shaders/test.frag.glsl");
+  //std::string file_v("../src/shaders/pbr.vert.glsl");
+  //std::string file_f("../src/shaders/pbr.frag.glsl");
   //std::string file_v("../src/shaders/glint.vert.glsl");
   //std::string file_f("../src/shaders/glint.frag.glsl");
   
-  auto shaders_src = std::vector<std::pair<GLenum, std::string>>({
+  /*auto shaders_src = std::vector<std::pair<GLenum, std::string>>({
                             { GL_VERTEX_SHADER, file_v},
                             { GL_FRAGMENT_SHADER, file_f}
-                          });
+                          });*/
+  auto shaders_src = std::vector<std::pair<GLenum, std::string>>({
+    {GL_VERTEX_SHADER, file_v},
+    {GL_FRAGMENT_SHADER, file_f}
+  });
   instance = program::make_program(shaders_src);
 
   instance->use();
 
   init_vbo(instance);
   init_uniform(instance);
-  load_texture(&colorTex, "../resources/metal/color.jpg");
+  //load_texture(&colorTex, "../resources/metal/color.jpg");
   init_anim();
 
   IMGUI_CHECKVERSION();
