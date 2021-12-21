@@ -22,6 +22,7 @@
 
 #include "program.hh"
 #include "sphere.hh"
+#include "scene.hh"
 
 //#define DEBUG
 
@@ -161,6 +162,13 @@ void init_uniform(program* instance)
 }
 
 int main(int argc, char** argv)
+{
+  (void) argc;
+  (void) argv;
+  Scene scene("../scenes/cornell.json");
+}
+
+int toto(int argc, char** argv)
 {
 
   initGlut(argc, argv);
