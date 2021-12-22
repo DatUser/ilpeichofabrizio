@@ -25,6 +25,7 @@ struct TriangleI
 };
 
 layout (std430, binding=5) buffer triangle_buffer { TriangleI triangles[]; };
+layout (std430, binding=6) buffer lights_buffer { TriangleI lights[]; };
 
 
 uniform int u_frame;
@@ -90,95 +91,7 @@ struct Sample
 // *                                 SCENE                                     *
 // *****************************************************************************
 
-Sphere sphere1 = Sphere(vec3(-3.75, -3.75, -2.5), 1.25, mats[0]);
-Sphere sphere2 = Sphere(vec3(0, -3.75, -2.5), 1.25, mats[0]);
-Sphere sphere3 = Sphere(vec3(3.75, -3.75, -2.5), 1.25, mats[0]);
-
-Triangle floor1 = Triangle(
-  vec3(5.1, -5, -5),
-  vec3(-5.1, -5, -5),
-  vec3(5.1, -5, 0),
-  mats[0]
-);
-
-Triangle floor2 = Triangle(
-  vec3(-5.1, -5, 0),
-  vec3(5.1, -5, 0),
-  vec3(-5.1, -5, -5),
-  mats[0]
-);
-
-Triangle ceil1 = Triangle(
-  vec3(-5.1, 5 + 1e-3, -5),
-  vec3(5.1, 5 + 1e-3, -5),
-  vec3(5.1, 5 + 1e-3, 0),
-  mats[0]
-);
-
-Triangle ceil2 = Triangle(
-  vec3(5.1, 5 + 1e-3, 0),
-  vec3(-5.1, 5 + 1e-3, 0),
-  vec3(-5.1, 5 + 1e-3, -5),
-  mats[0]
-);
-
-Triangle left1 = Triangle(
-  vec3(-5,  -5.1, -5),
-  vec3(-5,  5.1, -5),
-  vec3(-5,  -5.1,  0),
-  mats[0]
-);
-
-Triangle left2 = Triangle(
-  vec3(-5,  5.1, -5),
-  vec3(-5,  5.1, 0),
-  vec3(-5,  -5.1,  0),
-  mats[0]
-);
-
-Triangle right1 = Triangle(
-  vec3( 5,  5.1, -5),
-  vec3( 5,  -5.1, -5),
-  vec3( 5,  -5.1,  0),
-  mats[0]
-);
-
-Triangle right2 = Triangle(
-  vec3( 5,  5.1, 0),
-  vec3( 5,  5.1, -5),
-  vec3( 5,  -5.1,  0),
-  mats[0]
-);
-
-Triangle back1 = Triangle(
-  vec3( -5,  -5, -5),
-  vec3( 5,  -5, -5),
-  vec3(-5,  5,  -5),
-  mats[0]
-);
-
-Triangle back2 = Triangle(
-  vec3( 5,  -5, -5),
-  vec3( 5,  5, -5),
-  vec3(-5,  5,  -5),
-  mats[0]
-);
-
-Triangle light1 = Triangle(
-  vec3(-2.5, 5, -3.5),
-  vec3(2.5, 5, -1.5),
-  vec3(2.5, 5, -3.5),
-  mats[1]
-);
-
-Triangle light2 = Triangle(
-  vec3(-2.5, 5, -3.5),
-  vec3(2.5, 5, -1.5),
-  vec3(-2.5, 5, -1.5),
-  mats[1]
-);
-
-float camera_pos_z = 1000.0;
+float camera_pos_z = 3.0;
 
 
 Collision collisions[42];
@@ -441,10 +354,6 @@ float geometrySmith(float dotNV, float dotNL, float alpha2)
 
 vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
-  //temporary
-  vec3 lightPos = vec3(0.0, 3.0, 3.0);
-  vec3 lightColor = vec3(1.0, 1.0, 1.0);
-
   //bissector of v and lightdir
   vec3 h = normalize(wi + wo);
 
@@ -523,12 +432,18 @@ Sample area_sample(Triangle t, vec3 origin)
 vec3 uniform_sample_one_light(Collision obj_col)
 {
   // TODO: pick random light
-  Triangle light = RandomFloat01(rngState) > 0.5 ? light1 : light2;
+  int rand_i = int(RandomFloat01(rngState) * lights.length());
+  TriangleI l_ref = lights[rand_i];
+
+  Triangle light;
+  light.p0 = vertices[int(l_ref.vertices_index.x)].xyz;    // FIXME should pass int directly
+  light.p1 = vertices[int(l_ref.vertices_index.y)].xyz;
+  light.p2 = vertices[int(l_ref.vertices_index.z)].xyz;
+  light.mat = mats[l_ref.mat_id];
 
   // Sample a ray direction from light to collision point
   Sample light_sample = area_sample(light, obj_col.p);
   vec3 wi = light_sample.value;
-
 
   // Add small displacement to prevent being on the surface
   Ray ray_in = Ray(
@@ -652,7 +567,7 @@ void main()
   
   // Get this pixel's world-space ray
   Ray ray;
-  ray.origin = vec3(0.0, 0.0, camera_pos_z);
+  ray.origin = vec3(0.0, 0.2, camera_pos_z);
   ray.dir = normalize(pixel_world - ray.origin);
 
   // Cast the ray out into the world and intersect the ray with objects

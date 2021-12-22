@@ -44,6 +44,7 @@ GLuint vbo[numVBOs];
 GLuint matSSBO;
 GLuint vertexSSBO;
 GLuint triangleSSBO;
+GLuint lightsSSBO;
 
 int width = 1024;
 int height = 1024;
@@ -96,6 +97,7 @@ void display()
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, matSSBO);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vertexSSBO);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, triangleSSBO);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightsSSBO);
 
   glDispatchCompute(workGroupsX, workGroupsY, workGroupsZ);
   glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -238,6 +240,12 @@ int main(int argc, char** argv)
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleSSBO);
   glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * scene.get_triangles().size(), &scene.get_triangles()[0], GL_STATIC_DRAW);
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+  glGenBuffers(1, &lightsSSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsSSBO);
+  glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * scene.get_lights().size(), &scene.get_lights()[0], GL_STATIC_DRAW);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
 
   glGenVertexArrays(1, vao); TEST_OPENGL_ERROR();
   glGenBuffers(numVBOs, vbo); TEST_OPENGL_ERROR();
