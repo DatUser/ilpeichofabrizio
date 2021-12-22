@@ -23,41 +23,6 @@ Scene::Scene(const std::string& path)
 
 void Scene::parse_scene(json j)
 {
-  // Materials
-  std::vector<Material> materials;
-  for (auto const& j_mat : j.at("materials"))
-  {
-    auto kd = j_mat.at("Kd").get<std::array<float, 3>>();
-    auto ke = j_mat.at("Ke").get<std::array<float, 3>>();
-    Material mat = {
-      glm::vec3(kd[0], kd[1], kd[2]),
-      glm::vec3(ke[0], ke[1], ke[2])
-    };
-    materials.push_back(mat);
-  }                
-
-  std::cout << "Materials: " << materials.size() << std::endl;
-
-  // Triangles
-  std::vector<Triangle> triangles;
-  for (auto const& j_tri : j.at("triangles"))
-  {
-    auto p1 = j_tri.at("p1").get<std::array<float, 3>>();
-    auto p2 = j_tri.at("p2").get<std::array<float, 3>>();
-    auto p3 = j_tri.at("p3").get<std::array<float, 3>>();
-    auto mat_id = j_tri.at("matId").get<uint8_t>();
-    Triangle t = {
-      glm::vec3(p1[0], p1[1], p1[2]),
-      glm::vec3(p2[0], p2[1], p2[2]),
-      glm::vec3(p3[0], p3[1], p3[2]),
-      mat_id
-    };
-    triangles.push_back(t);
-  }                
-
-  std::cout << "Triangles: " << triangles.size() << std::endl;
-
-  // Obj files
   for (auto const& j_mod : j.at("models"))
   {
     auto obj_file = j_mod.at("objFile").get<std::string>();
@@ -76,7 +41,7 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
 {
   tinyobj::attrib_t attrib;
   std::vector<tinyobj::shape_t> shapes;
-  std::vector<tinyobj::material_t> materials;
+  std::vector<tinyobj::material_t> mtls;
 
   std::string err;
   
@@ -84,7 +49,7 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
     ? NULL
     : mtl_basedir.c_str();
   
-  bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
+  bool ret = tinyobj::LoadObj(&attrib, &shapes, &mtls, &err,
                               obj_file.c_str(), mtl_basedir_cstr);
 
   if (!err.empty()) std::cerr << err << std::endl;
@@ -92,33 +57,52 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
   if (!ret) std::cerr << "Model file could not be parsed !" << std::endl;
   else std::cout << "Model successfully loaded !" << std::endl;
 
-  std::vector<glm::vec3> vertices;
+  // Materials
+  for (const auto& mtl : mtls) {
+    materials_.push_back({
+      glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 1.0),    // kd
+      glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 1.0)  // ke
+    });
+  }
 
-  // Here we load all meshes
+  // Vertices
+  for (size_t i = 0; i < attrib.vertices.size(); i++)
+  {
+    Vertex vertex(
+      attrib.vertices[3 * i],
+      attrib.vertices[3 * i + 1],
+      attrib.vertices[3 * i + 2],
+      0.f
+    );
+    vertices_.push_back(vertex);
+  }
+
+
+  // Triangles
   for (const auto& shape : shapes)
   {
-    size_t idx_offset = 0;
-
     // Iterate through triangles
+    size_t idx_offset = 0;
     for (size_t face_v : shape.mesh.num_face_vertices)
     {
+      Triangle triangle;
+      triangle.mat_id = shape.mesh.material_ids[face_v];
+
       // Iterate inside of triangles
       for (size_t v = 0; v < face_v; ++v)
       {
         size_t idx = shape.mesh.indices[idx_offset + v].vertex_index;
-
-        glm::vec3 vertex = glm::vec3(
-                  attrib.vertices[3 * idx],
-                  attrib.vertices[3 * idx + 1],
-                  attrib.vertices[3 * idx + 2]
-        );
-        vertices.push_back(vertex);
+        triangle.vertices_index[v] = idx; 
       }
+      triangles_.push_back(triangle);
       idx_offset += face_v;
     }
   }
 
-  std::cout << "Loaded " << vertices.size()<< " vertices" << std::endl;
+  materials_.push_back({glm::vec4(0.5, 0.5, 0.5, 1), glm::vec4(0, 0, 0, 0)});
+  materials_.push_back({glm::vec4(1, 1, 1, 1), 20.f*glm::vec4(1, 1, 1, 1)});
+
+  std::cout << "Loaded " << vertices_.size()<< " vertices" << std::endl;
 
   std::cout << "Shape size: " << shapes.size() << std::endl;
   std::cout << "Face size: " << shapes[0].mesh.num_face_vertices.size() << std::endl;

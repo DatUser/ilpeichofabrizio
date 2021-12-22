@@ -5,10 +5,27 @@
 layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding=0, rgba8) uniform image2D prev_frame;
 layout (binding=1, rgba8) uniform image2D new_frame;
-
 #ifdef DEBUG
 layout (binding=2, rgba32f) uniform image2D debug_texture;
 #endif
+
+struct Material
+{
+  vec4 albedo;
+  vec4 emission;
+};
+
+layout (std430, binding=3) buffer material_buffer { Material mats[]; };
+layout (std430, binding=4) buffer vertex_buffer { vec4 vertices[]; };
+
+struct TriangleI
+{
+  vec3 vertices_index;
+  int mat_id;
+};
+
+layout (std430, binding=5) buffer triangle_buffer { TriangleI triangles[]; };
+
 
 uniform int u_frame;
 
@@ -40,14 +57,6 @@ struct Light
 {
   vec3 position;
 };
-
-struct Material
-{
-  vec3 albedo;
-  vec3 emission;
-  bool is_microfacet;
-};
-
 
 struct Sphere
 {
@@ -88,152 +97,92 @@ struct Sample
 
 Light light = Light(vec3(0, 1, 3));
 
-Material emissive = Material(
-  vec3(1, 1, 1),
-  vec3(1.0, 0.9, 0.7) * 30.f,
-  false
-);
-
-Material emissive2 = Material(
-  vec3(1, 1, 1),
-  vec3(1.0, 0.0, 0.0) * 5.f,
-  false
-);
-
-Material gray = Material(
-  vec3(0.7, 0.7, 0.7),
-  vec3(0, 0, 0),
-  false
-);
-
-Material light_blue = Material(
-  vec3(0.9f, 0.75f, 0.9f),
-  vec3(0, 0, 0),
-  false
-);
-
-Material pink = Material(
-  vec3(0.955008, 0.637427, 0.538163),
-  vec3(0, 0, 0),
-  true 
-);
-
-Material pink2 = Material(
-  vec3(0.75f, 0.9f, 0.9f),
-  vec3(0, 0, 0),
-  true 
-);
-
-Material gold = Material(
-  vec3(0.9f, 0.9f, 0.75f),
-  vec3(0, 0, 0),
-  false
-);
-
-Material red = Material(
-  vec3(0.7f, 0.1f, 0.1f),
-  vec3(0, 0, 0),
-  false
-);
-
-Material green = Material(
-  vec3(0.1f, 0.7f, 0.1f),
-  vec3(0, 0, 0),
-  false
-);
-
-Material blue = Material(
-  vec3(0.1f, 0.1f, 0.7f),
-  vec3(0, 0, 0),
-  false
-);
-
-Sphere sphere1 = Sphere(vec3(-3.75, -3.75, -2.5), 1.25, gold);
-Sphere sphere2 = Sphere(vec3(0, -3.75, -2.5), 1.25, light_blue);
-Sphere sphere3 = Sphere(vec3(3.75, -3.75, -2.5), 1.25, pink);
+Sphere sphere1 = Sphere(vec3(-3.75, -3.75, -2.5), 1.25, mats[0]);
+Sphere sphere2 = Sphere(vec3(0, -3.75, -2.5), 1.25, mats[0]);
+Sphere sphere3 = Sphere(vec3(3.75, -3.75, -2.5), 1.25, mats[0]);
 
 Triangle floor1 = Triangle(
   vec3(5.1, -5, -5),
   vec3(-5.1, -5, -5),
   vec3(5.1, -5, 0),
-  gray
+  mats[0]
 );
 
 Triangle floor2 = Triangle(
   vec3(-5.1, -5, 0),
   vec3(5.1, -5, 0),
   vec3(-5.1, -5, -5),
-  gray
+  mats[0]
 );
 
 Triangle ceil1 = Triangle(
   vec3(-5.1, 5 + 1e-3, -5),
   vec3(5.1, 5 + 1e-3, -5),
   vec3(5.1, 5 + 1e-3, 0),
-  gray
+  mats[0]
 );
 
 Triangle ceil2 = Triangle(
   vec3(5.1, 5 + 1e-3, 0),
   vec3(-5.1, 5 + 1e-3, 0),
   vec3(-5.1, 5 + 1e-3, -5),
-  gray
+  mats[0]
 );
 
 Triangle left1 = Triangle(
   vec3(-5,  -5.1, -5),
   vec3(-5,  5.1, -5),
   vec3(-5,  -5.1,  0),
-  red
+  mats[0]
 );
 
 Triangle left2 = Triangle(
   vec3(-5,  5.1, -5),
   vec3(-5,  5.1, 0),
   vec3(-5,  -5.1,  0),
-  red
+  mats[0]
 );
 
 Triangle right1 = Triangle(
   vec3( 5,  5.1, -5),
   vec3( 5,  -5.1, -5),
   vec3( 5,  -5.1,  0),
-  green
+  mats[0]
 );
 
 Triangle right2 = Triangle(
   vec3( 5,  5.1, 0),
   vec3( 5,  5.1, -5),
   vec3( 5,  -5.1,  0),
-  green
+  mats[0]
 );
 
 Triangle back1 = Triangle(
   vec3( -5,  -5, -5),
   vec3( 5,  -5, -5),
   vec3(-5,  5,  -5),
-  gray
+  mats[0]
 );
 
 Triangle back2 = Triangle(
   vec3( 5,  -5, -5),
   vec3( 5,  5, -5),
   vec3(-5,  5,  -5),
-  gray
+  mats[0]
 );
 
 Triangle light1 = Triangle(
   vec3(-2.5, 5, -3.5),
   vec3(2.5, 5, -1.5),
   vec3(2.5, 5, -3.5),
-  emissive
+  mats[1]
 );
 
 Triangle light2 = Triangle(
   vec3(-2.5, 5, -3.5),
   vec3(2.5, 5, -1.5),
   vec3(-2.5, 5, -1.5),
-  emissive
+  mats[1]
 );
 
 float camera_pos_z = 7.0;
@@ -470,7 +419,7 @@ Sample cosine_sample_hemisphere(vec3 n, vec2 u)
 vec3 evaluate_lambert_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
   //return obj_col.mat.albedo;
-  return obj_col.mat.albedo * INV_PI;
+  return obj_col.mat.albedo.rgb * INV_PI;
 }
 
 vec3 f0 = vec3(1.00, 0.71, 0.29); //Pre-computed (default is water value)
@@ -528,7 +477,7 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 
   //Calculate Schlick Fresnel approximation
   //Represents ks
-  vec3 nFresnel = fresnelSchlick(dotLH, obj_col.mat.albedo); 
+  vec3 nFresnel = fresnelSchlick(dotLH, obj_col.mat.albedo.rgb); 
 
   //Calculate Smith GGX 
   float nGeometric = geometrySmith(dotNV, dotNL, alpha2);
@@ -540,7 +489,7 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
   //Computing diffuse Lambert
   vec3 kd = vec3(1.0);
   kd = (kd - nFresnel) * (1.0 - metalness);
-  vec3 diffuse = kd * obj_col.mat.albedo / PI;
+  vec3 diffuse = kd * obj_col.mat.albedo.rgb / PI;
 
   vec3 color = (diffuse + specular) * dotNL;
   color = color / (color + vec3(1.0));
@@ -551,10 +500,10 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 
 vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
-  if (obj_col.mat.is_microfacet)
-    return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
-  else
-    return evaluate_lambert_bsdf(wo, wi, obj_col);
+  //if (obj_col.mat.is_microfacet)
+  //  return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
+  //else
+  return evaluate_lambert_bsdf(wo, wi, obj_col);
 }
 
 
@@ -603,8 +552,8 @@ vec3 uniform_sample_one_light(Collision obj_col)
 
   Collision light_col = intersect_scene(ray_in);
 
-  // Discard if no hit or hit non emissive object 
-  if (light_col.t <= 0 || light_col.mat.emission == vec3(0)) return vec3(0);
+  // Discard if no hit or hit non mats[1] object 
+  if (light_col.t <= 0 || light_col.mat.emission.rgb == vec3(0)) return vec3(0);
   
   // Evaluate the BSDF at the object's collision 
   vec3 wo = -obj_col.ray.dir;
@@ -616,7 +565,7 @@ vec3 uniform_sample_one_light(Collision obj_col)
 
   if (f == vec3(0) || pdf == 0) return vec3(0);
 
-  return light_col.mat.emission * f * abs(dot(wi, obj_col.n)) / pdf;
+  return light_col.mat.emission.rgb * f * abs(dot(wi, obj_col.n)) / pdf;
 }
 
 
@@ -629,7 +578,7 @@ vec3 pathtrace(Ray ray)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 8;
+  int max_bounces = 4;
   bool specular_bounce = false;
 
   for (int bounces = 0; ; bounces++)
@@ -652,7 +601,7 @@ vec3 pathtrace(Ray ray)
     {
       if (obj_col.t > 0)
       {
-        L += throughput * obj_col.mat.emission;
+        L += throughput * obj_col.mat.emission.rgb;
       }
       else
       {

@@ -41,6 +41,10 @@
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
 
+GLuint matSSBO;
+GLuint vertexSSBO;
+GLuint triangleSSBO;
+
 int width = 1024;
 int height = 1024;
 
@@ -52,6 +56,8 @@ GLuint textures[3]; // The texture ID of the full screen texture
 unsigned char *prevFrameTexture; // The screen texture RGBA8888 color data
 unsigned char *newFrameTexture; // The screen texture RGBA8888 color data
 float *debugTexture; // The screen texture RGBA8888 color data
+
+GLuint scene_textures[3];
 
 program* pathtrace_shader;
 program* display_shader;
@@ -86,6 +92,10 @@ void display()
   #ifdef DEBUG
   glBindImageTexture(2, textures[2], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);            // debug texture
   #endif
+
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, matSSBO);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vertexSSBO);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, triangleSSBO);
 
   glDispatchCompute(workGroupsX, workGroupsY, workGroupsZ);
   glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -163,13 +173,8 @@ void init_uniform(program* instance)
 
 int main(int argc, char** argv)
 {
-  (void) argc;
-  (void) argv;
   Scene scene("../scenes/cornell.json");
-}
-
-int toto(int argc, char** argv)
-{
+  std::cout << scene.get_materials().size() << std::endl;
 
   initGlut(argc, argv);
 
@@ -217,6 +222,22 @@ int toto(int argc, char** argv)
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, (const void *)debugTexture);
   #endif
+  
+  // Scene data textures
+  glGenBuffers(1, &matSSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, matSSBO);
+  glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Material) * scene.get_materials().size(), &scene.get_materials()[0], GL_STATIC_DRAW);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+  glGenBuffers(1, &vertexSSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexSSBO);
+  glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vertex) * scene.get_vertices().size(), &scene.get_vertices()[0], GL_STATIC_DRAW);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+  
+  glGenBuffers(1, &triangleSSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleSSBO);
+  glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * scene.get_triangles().size(), &scene.get_triangles()[0], GL_STATIC_DRAW);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
   glGenVertexArrays(1, vao); TEST_OPENGL_ERROR();
   glGenBuffers(numVBOs, vbo); TEST_OPENGL_ERROR();
