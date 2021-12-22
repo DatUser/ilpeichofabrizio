@@ -53,11 +53,6 @@ struct Ray
   vec3 dir;
 };
 
-struct Light
-{
-  vec3 position;
-};
-
 struct Sphere
 {
   vec3 center;
@@ -94,8 +89,6 @@ struct Sample
 // *****************************************************************************
 // *                                 SCENE                                     *
 // *****************************************************************************
-
-Light light = Light(vec3(0, 1, 3));
 
 Sphere sphere1 = Sphere(vec3(-3.75, -3.75, -2.5), 1.25, mats[0]);
 Sphere sphere2 = Sphere(vec3(0, -3.75, -2.5), 1.25, mats[0]);
@@ -185,7 +178,7 @@ Triangle light2 = Triangle(
   mats[1]
 );
 
-float camera_pos_z = 7.0;
+float camera_pos_z = 1000.0;
 
 
 Collision collisions[42];
@@ -352,36 +345,29 @@ Collision collision(Triangle triangle, Ray ray)
 
 Collision intersect_scene(Ray ray)
 {
-  int n = 0;
-  collisions[n] = collision(sphere1, ray); n++;
-  collisions[n] = collision(sphere2, ray); n++;
-  collisions[n] = collision(sphere3, ray); n++;
-  collisions[n] = collision(floor1, ray); n++;
-  collisions[n] = collision(floor2, ray); n++;
-  collisions[n] = collision(ceil1, ray); n++;
-  collisions[n] = collision(ceil2, ray); n++;
-  collisions[n] = collision(left1, ray); n++;
-  collisions[n] = collision(left2, ray); n++;
-  collisions[n] = collision(right1, ray); n++;
-  collisions[n] = collision(right2, ray); n++;
-  collisions[n] = collision(back1, ray); n++;
-  collisions[n] = collision(back2, ray); n++;
-  collisions[n] = collision(light1, ray); n++;
-  collisions[n] = collision(light2, ray); n++;
+  // Initial null collision
+  Collision min_col;
+  min_col.t = -1;
 
-  float infinity = 1.0 / 0.0;
-  float min_val = infinity;
-  int min_i = -1;
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < triangles.length(); ++i)
   {
-    if (collisions[i].t > 0 && min_val > collisions[i].t)
+    TriangleI t_ref = triangles[i];
+
+    Triangle triangle;
+    triangle.p0 = vertices[int(t_ref.vertices_index.x)].xyz;    // FIXME should pass int directly
+    triangle.p1 = vertices[int(t_ref.vertices_index.y)].xyz;
+    triangle.p2 = vertices[int(t_ref.vertices_index.z)].xyz;
+    triangle.mat = mats[t_ref.mat_id];
+
+    Collision col = collision(triangle, ray);
+
+    // Not found collision yet or new collision is nearer
+    if (min_col.t == -1 || (col.t > 0 && min_col.t > col.t))
     {
-      min_val = collisions[i].t;
-      min_i = i;
+      min_col = col;
     }
   }
-  min_i = (min_i == -1) ? 0 : min_i;
-  return collisions[min_i];
+  return min_col;
 }
 
 
