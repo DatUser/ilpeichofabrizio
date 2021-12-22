@@ -60,8 +60,8 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
   // Materials
   for (const auto& mtl : mtls) {
     materials_.push_back({
-      glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 1.0),    // kd
-      glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 1.0)  // ke
+      glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 0.0),    // kd
+      glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 0.0)  // ke
     });
   }
 
@@ -97,12 +97,14 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
       {
         size_t idx = shape.mesh.indices[idx_offset + v].vertex_index;
         triangle.vertices_index[v] = idx; 
-      }
 
+      }
+      
       if (triangle.mat_id != -1 && materials_[triangle.mat_id].ke != glm::vec4(0.f))
       {
         lights_.push_back(triangle);
       }
+
 
       triangles_.push_back(triangle);
       idx_offset += face_v;
@@ -110,10 +112,9 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
     }
   }
 
-  std::cout << "Triangles parsed" << std::endl;
+  std::cout << "Lights " << lights_.size() << std::endl;
 
-  materials_.push_back({glm::vec4(0.5, 0.5, 0.5, 1), glm::vec4(0, 0, 0, 0)});
-  materials_.push_back({glm::vec4(1, 1, 1, 1), 20.f*glm::vec4(1, 1, 1, 1)});
+  std::cout << "Triangles parsed" << std::endl;
 
   std::cout << "Loaded " << vertices_.size()<< " vertices" << std::endl;
 

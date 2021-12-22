@@ -41,7 +41,7 @@ uniform int u_frame;
 #define INV_PI 				0.3183099
 #define INV_TWO_PI 		0.1591549
 #define INV_FOUR_PI 	0.0795775
-#define EPSILON       1e-8
+#define EPSILON       1e-3
 
 
 // *****************************************************************************
@@ -479,7 +479,7 @@ vec3 pathtrace(Ray ray)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 4;
+  int max_bounces = 8;
   bool specular_bounce = false;
 
   for (int bounces = 0; ; bounces++)
