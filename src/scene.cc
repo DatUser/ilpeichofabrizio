@@ -65,6 +65,8 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
     });
   }
 
+  std::cout << "Material parsed" << std::endl;
+
   // Vertices
   for (size_t i = 0; i < attrib.vertices.size(); i++)
   {
@@ -77,16 +79,18 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
     vertices_.push_back(vertex);
   }
 
+  std::cout << "Vertices parsed" << std::endl;
 
   // Triangles
   for (const auto& shape : shapes)
   {
     // Iterate through triangles
     size_t idx_offset = 0;
+    size_t i_face = 0;
     for (size_t face_v : shape.mesh.num_face_vertices)
     {
       Triangle triangle;
-      triangle.mat_id = shape.mesh.material_ids[face_v];
+      triangle.mat_id = shape.mesh.material_ids[i_face];
 
       // Iterate inside of triangles
       for (size_t v = 0; v < face_v; ++v)
@@ -94,10 +98,19 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
         size_t idx = shape.mesh.indices[idx_offset + v].vertex_index;
         triangle.vertices_index[v] = idx; 
       }
+
+      if (triangle.mat_id != -1 && materials_[triangle.mat_id].ke != glm::vec4(0.f))
+      {
+        lights_.push_back(triangle);
+      }
+
       triangles_.push_back(triangle);
       idx_offset += face_v;
+      i_face++;
     }
   }
+
+  std::cout << "Triangles parsed" << std::endl;
 
   materials_.push_back({glm::vec4(0.5, 0.5, 0.5, 1), glm::vec4(0, 0, 0, 0)});
   materials_.push_back({glm::vec4(1, 1, 1, 1), 20.f*glm::vec4(1, 1, 1, 1)});

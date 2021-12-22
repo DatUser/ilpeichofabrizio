@@ -37,6 +37,7 @@ class Scene
     const std::vector<Vertex>& get_vertices() { return vertices_; };
     const std::vector<Material>& get_materials() { return materials_; };
     const std::vector<Triangle>& get_triangles() { return triangles_; };
+    const std::vector<Triangle>& get_lights() { return lights_ ; }
     const std::vector<BVHNode>& get_bvh() { return bvh_; };
 
   private:
@@ -48,5 +49,6 @@ class Scene
     std::vector<Vertex> vertices_;
     std::vector<Material> materials_;  
     std::vector<Triangle> triangles_;
+    std::vector<Triangle> lights_;
     std::vector<BVHNode> bvh_;
 };
