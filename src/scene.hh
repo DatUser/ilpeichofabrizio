@@ -3,22 +3,22 @@
 #include <string>
 #include <vector>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-
-struct Triangle
-{
-  glm::vec3 p1;
-  glm::vec3 p2;
-  glm::vec3 p3;
-  uint8_t mat_id;
-};
+using Vertex = glm::vec4;
 
 struct Material
 {
-  glm::vec3 kd;
-  glm::vec3 ke;
+  glm::vec4 kd;
+  glm::vec4 ke;
+};
+
+struct Triangle
+{
+  glm::vec3 vertices_index;
+  int mat_id;
 };
 
 struct BVHNode
@@ -34,8 +34,9 @@ class Scene
   public:
     Scene(const std::string& path);
 
-    const std::vector<Triangle>& get_triangles() { return triangles_; };
+    const std::vector<Vertex>& get_vertices() { return vertices_; };
     const std::vector<Material>& get_materials() { return materials_; };
+    const std::vector<Triangle>& get_triangles() { return triangles_; };
     const std::vector<BVHNode>& get_bvh() { return bvh_; };
 
   private:
@@ -44,7 +45,8 @@ class Scene
                     float scale, const glm::vec3& translation);
     void build_bvh();
 
-    std::vector<Triangle> triangles_;
+    std::vector<Vertex> vertices_;
     std::vector<Material> materials_;  
-    std::vector<BVHNode> bvh_;  
+    std::vector<Triangle> triangles_;
+    std::vector<BVHNode> bvh_;
 };
