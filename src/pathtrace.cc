@@ -66,12 +66,17 @@ program* display_shader;
 GLint frame = 0;
 float anim_time = 0.0;
 
-bool click = true;
+bool keyboard = false;
+glm::vec4 keys_wasd = glm::vec4(0);
+
+bool click = false;
 glm::vec2 start_pos;
+
 float yaw = -90.0;
 float pitch = 0.0;
-
 glm::vec3 cameraFront;
+glm::vec3 cameraPos   = glm::vec3(0, 1.0f, 4.0f);
+glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
 
 void mouseFunc(int glut_button, int state, int x, int y)
@@ -103,7 +108,7 @@ void mouseFunc(int glut_button, int state, int x, int y)
       break;
     case GLUT_UP:
       click = false;
-      frame = 0;  // reset frames for blending weight in shader
+      if (keys_wasd == glm::vec4(0)) frame = 0;  // reset frames for blending weight in shader if not moving
       break;
     
     default:
@@ -133,7 +138,61 @@ void motionFunc(int x, int y)
   cameraFront = glm::normalize(direction);
 }
 
+void keyboardFunc(unsigned char key, int x, int y)
+{
+  switch(key) 
+  {
+    case 'w':
+      keys_wasd[0] = 1;
+      break;
+    case 's':
+      keys_wasd[1] = 1;
+      break;
+    case 'a':
+      keys_wasd[2] = 1;
+      break;
+    case 'd':
+      keys_wasd[3] = 1;
+      break;
+    default:
+      break;
+  } 
+}
 
+void keyboardUpFunc(unsigned char key, int x, int y)
+{
+  switch(key) 
+  {
+    case 'w':
+      keys_wasd[0] = 0;
+      break;
+    case 's':
+      keys_wasd[1] = 0;
+      break;
+    case 'a':
+      keys_wasd[2] = 0;
+      break;
+    case 'd':
+      keys_wasd[3] = 0;
+      break;
+    default:
+      break;
+  } 
+
+  if (!click) frame = 0;  // reset frames for blending weight in shader if not moving
+}
+
+void update_camera_pos()
+{
+  if (keys_wasd[0])
+    cameraPos += 0.05f * cameraFront;
+  else if (keys_wasd[1])
+    cameraPos -= 0.05f * cameraFront;
+  else if (keys_wasd[2])
+    cameraPos -= 0.05f * glm::normalize(glm::cross(cameraFront, cameraUp));
+  else if (keys_wasd[3])
+    cameraPos += 0.05f * glm::normalize(glm::cross(cameraFront, cameraUp));
+}
 
 void display()
 {
@@ -144,25 +203,24 @@ void display()
   // PHASE 1 : Path tracing compute shader
   pathtrace_shader->use();
 
-  glm::vec3 cameraPos   = glm::vec3(0, 1.0f, 4.0f);
-  glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+  update_camera_pos();
   glm::mat4 cam2world = glm::inverse(glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp));
 
-  GLint uniform_cam2world_id;
+  GLint u_cam2world_id;
   std::string name = "u_cam2world";
-  uniform_cam2world_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
-  glUniformMatrix4fv(uniform_cam2world_id, 1, GL_FALSE, &cam2world[0][0]);TEST_OPENGL_ERROR();
+  u_cam2world_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
+  glUniformMatrix4fv(u_cam2world_id, 1, GL_FALSE, &cam2world[0][0]);TEST_OPENGL_ERROR();
 
-  GLint uniform_click_id;
-  name = "u_click";
-  uniform_click_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
-  glUniform1i(uniform_click_id, (int)click); 
+  GLint u_is_moving_id;
+  name = "u_is_moving";
+  u_is_moving_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
+  glUniform1i(u_is_moving_id, (int)click || (keys_wasd != glm::vec4(0))); 
 
   //std::cout << frame << std::endl;
-  GLint uniform_frame_id;
+  GLint u_frame_id;
   name = "u_frame";
-  uniform_frame_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
-  glUniform1i(uniform_frame_id, frame);TEST_OPENGL_ERROR();
+  u_frame_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
+  glUniform1i(u_frame_id, frame);TEST_OPENGL_ERROR();
   frame++;
 
   int i = frame % 2 == 0;
@@ -219,6 +277,9 @@ bool initGlut(int &argc, char* argv[])
   glutReshapeFunc(resize);TEST_OPENGL_ERROR();
   glutMotionFunc(motionFunc);
   glutMouseFunc(mouseFunc);
+  glutKeyboardFunc(keyboardFunc);
+  glutKeyboardUpFunc(keyboardUpFunc);
+  glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
   return true;
 }
 

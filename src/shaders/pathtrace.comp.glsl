@@ -29,7 +29,7 @@ layout (std430, binding=6) buffer lights_buffer { TriangleI lights[]; };
 
 
 uniform int u_frame;
-uniform int u_click;
+uniform int u_is_moving;
 uniform mat4 u_cam2world;
 
 
@@ -590,7 +590,7 @@ void main()
   } 
 
   vec3 acc_color;
-  if (u_click == 1)
+  if (u_is_moving == 1)
   {
     acc_color = res;
   }
