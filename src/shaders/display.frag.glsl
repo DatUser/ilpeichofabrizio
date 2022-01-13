@@ -49,7 +49,7 @@ vec3 ACESFilm(vec3 x)
 
 void main()
 {
-  vec3 color = texture2D(tex, uv).rgb;
+  vec3 color = texture(tex, uv).rgb;
 
   color *= 0.5f;
 

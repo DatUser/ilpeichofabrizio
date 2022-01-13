@@ -24,7 +24,7 @@
 #include "sphere.hh"
 #include "scene.hh"
 
-//#define DEBUG
+#define DEBUG
 
 #define TEST_OPENGL_ERROR()                                                             \
   do {                                                                                  \
@@ -66,6 +66,73 @@ program* display_shader;
 GLint frame = 0;
 float anim_time = 0.0;
 
+bool click = true;
+glm::vec2 start_pos;
+float yaw = -90.0;
+float pitch = 0.0;
+
+glm::vec3 cameraFront;
+
+
+void mouseFunc(int glut_button, int state, int x, int y)
+{
+  int button;
+  switch (glut_button)
+  {
+  case GLUT_LEFT_BUTTON:
+    button = 0;
+    break;
+  case GLUT_RIGHT_BUTTON:
+    button = 1;
+    break;
+  case GLUT_MIDDLE_BUTTON:
+    button = 2;
+    break;
+  default:
+    button = -1;
+    break;
+  }
+
+  if (button >= 0)
+  {
+    switch (state)
+    {
+    case GLUT_DOWN:
+      start_pos = glm::vec2(x, y);
+      click = true;
+      break;
+    case GLUT_UP:
+      click = false;
+      frame = 0;  // reset frames for blending weight in shader
+      break;
+    
+    default:
+      break;
+    }
+  }
+}
+
+void motionFunc(int x, int y)
+{
+  if (!click) return;
+
+  glm::vec2 offset = glm::vec2(x, y) - start_pos;
+  start_pos = glm::vec2(x, y);
+
+  float sensitivity = 0.1f;
+  yaw += sensitivity * offset.x;
+  pitch -= sensitivity * offset.y;
+
+  if(pitch > 89.0f) pitch = 89.0f;
+  if(pitch < -89.0f) pitch = -89.0f;
+
+  glm::vec3 direction;
+  direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+  direction.y = sin(glm::radians(pitch));
+  direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+  cameraFront = glm::normalize(direction);
+}
+
 
 
 void display()
@@ -77,9 +144,23 @@ void display()
   // PHASE 1 : Path tracing compute shader
   pathtrace_shader->use();
 
+  glm::vec3 cameraPos   = glm::vec3(0, 1.0f, 4.0f);
+  glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+  glm::mat4 cam2world = glm::inverse(glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp));
+
+  GLint uniform_cam2world_id;
+  std::string name = "u_cam2world";
+  uniform_cam2world_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
+  glUniformMatrix4fv(uniform_cam2world_id, 1, GL_FALSE, &cam2world[0][0]);TEST_OPENGL_ERROR();
+
+  GLint uniform_click_id;
+  name = "u_click";
+  uniform_click_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
+  glUniform1i(uniform_click_id, (int)click); 
+
   //std::cout << frame << std::endl;
   GLint uniform_frame_id;
-  std::string name = "u_frame";
+  name = "u_frame";
   uniform_frame_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
   glUniform1i(uniform_frame_id, frame);TEST_OPENGL_ERROR();
   frame++;
@@ -136,6 +217,8 @@ bool initGlut(int &argc, char* argv[])
   glutCreateWindow ("Test OpenGL-POGL");TEST_OPENGL_ERROR();
   glutDisplayFunc(display);TEST_OPENGL_ERROR();
   glutReshapeFunc(resize);TEST_OPENGL_ERROR();
+  glutMotionFunc(motionFunc);
+  glutMouseFunc(mouseFunc);
   return true;
 }
 
@@ -194,10 +277,10 @@ int main(int argc, char** argv)
   memset(prevFrameTexture, 0, sizeof(char) * 4 * width * height);
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
-      prevFrameTexture[i * width * 4 + j * 4 + 0] = 42;
-      prevFrameTexture[i * width * 4 + j * 4 + 1] = 128;
-      prevFrameTexture[i * width * 4 + j * 4 + 2] = 255;
-      prevFrameTexture[i * width * 4 + j * 4 + 3] = 255;
+      prevFrameTexture[i * width * 4 + j * 4 + 0] = 0;
+      prevFrameTexture[i * width * 4 + j * 4 + 1] = 0;
+      prevFrameTexture[i * width * 4 + j * 4 + 2] = 0;
+      prevFrameTexture[i * width * 4 + j * 4 + 3] = 0;
     } 
   }
 

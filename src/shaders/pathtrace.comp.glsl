@@ -1,6 +1,6 @@
 #version 450
 
-//#define DEBUG
+#define DEBUG
 
 layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding=0, rgba8) uniform image2D prev_frame;
@@ -29,6 +29,8 @@ layout (std430, binding=6) buffer lights_buffer { TriangleI lights[]; };
 
 
 uniform int u_frame;
+uniform int u_click;
+uniform mat4 u_cam2world;
 
 
 // *****************************************************************************
@@ -537,8 +539,7 @@ vec3 pathtrace(Ray ray)
 
     // Russian roulette : save computing resources by terminating paths in an unbiased way
     float p = max(throughput.r, max(throughput.g, throughput.b));
-    if (RandomFloat01(rngState) > p)
-        break;
+    if (RandomFloat01(rngState) > p) break;
 
     // Add the energy we 'lose' by randomly terminating paths
     throughput *= 1.0f / p;            
@@ -561,14 +562,24 @@ void main()
   ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
   
   // Convert this pixel's screen space location to world space
-  float x_pixel = 2.0 * pixel.x / width - 1.0;
-  float y_pixel = 2.0 * pixel.y / height - 1.0;
-  vec3 pixel_world = vec3(x_pixel, y_pixel, camera_pos_z - 1.0);
-  
-  // Get this pixel's world-space ray
+  float fov = 45.0;
+  float alpha = fov * PI / 180.0;
+  float img_ratio = width / height;
+
+  float pixel_x_cam = (2 * (pixel.x + 0.5) / width - 1) * tan(alpha / 2) * img_ratio;
+  float pixel_y_cam = (2 * (pixel.y + 0.5) / height - 1) * tan(alpha / 2);
+
+  vec3 pixel_cam = vec3(pixel_x_cam, pixel_y_cam, -1);
+  vec4 pixel_world = u_cam2world * vec4(pixel_cam, 1);
+  pixel_world.xyz /= pixel_world.w;
+
+  vec3 pos_cam = vec3(0, 0, 0);
+  vec4 pos_world = u_cam2world * vec4(pos_cam, 1);
+  pos_world.xyz /= pos_world.w;
+
   Ray ray;
-  ray.origin = vec3(0.0, 0.2, camera_pos_z);
-  ray.dir = normalize(pixel_world - ray.origin);
+  ray.origin = pos_world.xyz;
+  ray.dir = normalize(pixel_world.xyz - ray.origin);
 
   // Cast the ray out into the world and intersect the ray with objects
   int spp = 1;
@@ -578,13 +589,21 @@ void main()
     res += 1.0 / float(spp) * pathtrace(ray);
   } 
 
-  float blend = 1.0 / (float(u_frame + 1));
+  vec3 acc_color;
+  if (u_click == 1)
+  {
+    acc_color = res;
+  }
+  else
+  {
+    float blend = 1.0 / (float(u_frame + 1));
 
-  vec3 acc_color = mix(
-    imageLoad(prev_frame, pixel).rgb,
-    res,
-    blend
-  );
+    acc_color = mix(
+      imageLoad(prev_frame, pixel).rgb,
+      res,
+      blend
+    );
+  }
 
   imageStore(new_frame, pixel, vec4(acc_color.xyz, 1.0));
 
