@@ -13,6 +13,8 @@ struct Material
 {
   glm::vec4 kd;
   glm::vec4 ke;
+  glm::vec4 ks;
+  glm::vec4 kt;
 };
 
 struct Triangle

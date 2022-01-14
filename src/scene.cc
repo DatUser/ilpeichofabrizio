@@ -60,9 +60,13 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
   // Materials
   for (const auto& mtl : mtls) {
     materials_.push_back({
-      glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 0.0),    // kd
-      glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 0.0)  // ke
+      glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 0.0),                         // kd
+      glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 0.0),                      // ke
+      glm::vec4(mtl.specular[0], mtl.specular[1], mtl.specular[2], 0.0),                      // ks
+      glm::vec4(mtl.transmittance[0], mtl.transmittance[1], mtl.transmittance[2], mtl.ior)    // kt + ior
     });
+    std::cout << mtl.specular[0] << " " <<  mtl.specular[1] << " " << mtl.specular[2] << std::endl;    // kt + ior
+    std::cout << mtl.transmittance[0] << " " <<  mtl.transmittance[1] << " " << mtl.transmittance[2] << std::endl;    // kt + ior
   }
 
   std::cout << "Material parsed" << std::endl;
