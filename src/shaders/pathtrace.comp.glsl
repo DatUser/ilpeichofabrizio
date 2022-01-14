@@ -563,8 +563,10 @@ vec3 pathtrace(Ray ray)
       }
     }
 
+    specular_bounce = (obj_col.transmitted || obj_col.mat.specular != vec4(0));
+    
     // Direct lighting estimation at current path vertex (end of the current path = light)
-    //if (!specular_bounce)
+    if (!specular_bounce)
       L += throughput * uniform_sample_one_light(obj_col);
 
     // Indirect lighting estimation
@@ -580,7 +582,6 @@ vec3 pathtrace(Ray ray)
 
     // Update how much light is received from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
-    specular_bounce = (obj_col.mat.specular != vec4(0) && !obj_col.transmitted || obj_col.transmitted);
 
     // Add small displacement to prevent being on the surface
     ray = Ray(
