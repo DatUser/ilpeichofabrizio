@@ -162,6 +162,8 @@ vec3 spherical_to_cartesian(float rho, float phi, float theta)
 //   - solve system using Cramer's rule
 Collision collision(Triangle triangle, Ray ray)
 {
+  float eps = EPSILON;
+
   vec3 edge1 = triangle.p1 - triangle.p0;
   vec3 edge2 = triangle.p2 - triangle.p0;
 
@@ -171,7 +173,7 @@ Collision collision(Triangle triangle, Ray ray)
   float a = dot(edge1, h);
 
   // Parallel ray and triangle
-  if (a > -EPSILON && a < EPSILON)
+  if (a > -eps && a < eps)
   {
     obj_col.t = -1;
     return obj_col;
@@ -196,7 +198,7 @@ Collision collision(Triangle triangle, Ray ray)
   }
 
   float t = dot(edge2, q) * f;
-  if (t < EPSILON)
+  if (t <= eps)
   {
     obj_col.t = -1;
     return obj_col;
@@ -333,6 +335,9 @@ Sample SoT_sample(Collision col, vec2 u)
 Sample sample_bsdf(Collision col)
 {
   vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
+
+  // WARNING : not so sure about that -> reverse n when need to sample the other way
+  if (dot(col.n, -col.ray.dir) < 0) col.n *= -1;
 
   // Specular / Transmissive only goes in one direction
   if (col.mat.specular != vec4(0) || col.mat.transmittance.xyz != vec3(0))
@@ -487,6 +492,9 @@ vec3 uniform_sample_one_light(Collision obj_col)
   Sample light_sample = area_sample(light, obj_col.p);
   vec3 wi = light_sample.value;
 
+  // Cannot sample if surface blocks ray from light
+  if (dot(obj_col.n, -obj_col.ray.dir) < 0 && dot(obj_col.n, wi) > 0) return vec3(0);
+
   // Add small displacement to prevent being on the surface
   Ray ray_in = Ray(
     obj_col.p + obj_col.n * 1.0e-2 * ((dot(wi, obj_col.n) < 0) ? -1.0 : 1.0),
@@ -521,7 +529,7 @@ vec3 pathtrace(Ray ray)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 8;
+  int max_bounces = 15;
   bool specular_bounce = false;
   float prev_ior = 1.0;
 
@@ -542,9 +550,9 @@ vec3 pathtrace(Ray ray)
     //  - it is the initial collision
     //  - previous was specular BSDF so no direct illumination estimate (Dirac distribution) 
     // Other cases are handled by direct lighting estimation
-    if (bounces == 0 || specular_bounce)
+    if (bounces == 0)
     {
-      if (obj_col.t > 0)
+      if (obj_col.t > 0 || specular_bounce)
       {
         L += throughput * obj_col.mat.emission.rgb;
       }
@@ -556,7 +564,8 @@ vec3 pathtrace(Ray ray)
     }
 
     // Direct lighting estimation at current path vertex (end of the current path = light)
-    L += throughput * uniform_sample_one_light(obj_col);
+    //if (!specular_bounce)
+      L += throughput * uniform_sample_one_light(obj_col);
 
     // Indirect lighting estimation
 
@@ -568,10 +577,10 @@ vec3 pathtrace(Ray ray)
     vec3 f = evaluate_bsdf(wo, wi, obj_col);
 
     prev_ior = obj_col.curr_ior;  // update IoR in case medium has changed after updating ray
-    //specular_bounce = obj_col.
 
     // Update how much light is received from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
+    specular_bounce = (obj_col.mat.specular != vec4(0) && !obj_col.transmitted || obj_col.transmitted);
 
     // Add small displacement to prevent being on the surface
     ray = Ray(
