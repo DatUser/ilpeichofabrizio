@@ -13,6 +13,8 @@ struct Material
 {
   vec4 albedo;
   vec4 emission;
+  vec4 specular;
+  vec4 transmittance;  // refraction index in the last component
 };
 
 layout (std430, binding=3) buffer material_buffer { Material mats[]; };
@@ -76,7 +78,8 @@ struct Collision
   float t;              // distance along ray
   vec3 p;               // world position of collision
   vec3 n;               // surface normal at collision
-  bool inside;          // ray inside the object or not
+  float curr_ior;
+  bool transmitted;
   Material mat;
   Ray ray;
   int object_index;     // index of the object
@@ -152,55 +155,6 @@ vec3 spherical_to_cartesian(float rho, float phi, float theta)
 // *                             COLLISIONS                                    *
 // *****************************************************************************
 
-// Adapted from scratchapixel's sphere collision 
-Collision collision(Sphere sphere, Ray ray)
-{
-  Collision obj_col;
-  obj_col.inside = false;
-
-  vec3 oc = sphere.center - ray.origin;
-  float t_ca = dot(oc, ray.dir);
-  float d2 = dot(oc, oc) - t_ca * t_ca;
-
-  // Ray goes outside of sphere
-  if (d2 > sphere.radius * sphere.radius) 
-  {
-    obj_col.t = -1;
-    return obj_col;
-  }
-
-  float t_hc = sqrt(sphere.radius*sphere.radius - d2);
-  float t0 = t_ca - t_hc;
-  float t1 = t_ca + t_hc;
-  float t_near = min(t0, t1);
-  float t_far = max(t0, t1);
-  obj_col.t = t_near;
-
-  // Sphere behind the ray, no collision
-  if (t_far < 0.0)
-  {
-    obj_col.t = -1.0;
-    return obj_col;
-  }
-
-  // Ray inside the sphere
-  if (t_near < 0.0)
-  {
-    obj_col.t = t_far;
-    obj_col.inside = true;
-  }
-
-  obj_col.p = ray.origin + ray.dir * obj_col.t; 
-  obj_col.n = normalize(obj_col.p - sphere.center);
-  obj_col.mat = sphere.mat;
-  obj_col.ray = ray;
-
-  // Flip normal if ray inside
-  if (obj_col.inside) obj_col.n *= -1.0;
-
-  return obj_col;
-}
-
 // Möller-Trumbore algorithm : 
 //   - express problem in barycentric coordinate P = wA + uB + vC
 //   - also : P = O + tD
@@ -212,7 +166,6 @@ Collision collision(Triangle triangle, Ray ray)
   vec3 edge2 = triangle.p2 - triangle.p0;
 
   Collision obj_col;
-  obj_col.inside = false;
 
   vec3 h = cross(ray.dir, edge2);
   float a = dot(edge1, h);
@@ -253,6 +206,7 @@ Collision collision(Triangle triangle, Ray ray)
   obj_col.p = ray.origin + ray.dir * obj_col.t; 
   obj_col.n = normalize(cross(edge1, edge2));
   obj_col.mat = triangle.mat;
+  obj_col.transmitted = false;
   obj_col.ray = ray;
 
   return obj_col;
@@ -316,8 +270,83 @@ Sample cosine_sample_hemisphere(vec3 n, vec2 u)
   return Sample(wi, pdf);
 }
 
+float fr_dielectric(float cos_i, float cos_t, float ior_i, float ior_t) {
+
+  // Fresnel reflectance formulae for dielectrics : parallel and perpendicular
+  // polarizations
+  float r_par = ((ior_t * cos_i) - (ior_i * cos_t)) /
+                ((ior_t * cos_i) + (ior_i * cos_t));
+  float r_per = ((ior_i * cos_i) - (ior_t * cos_t)) /
+                ((ior_i * cos_i) + (ior_t * cos_t));
+
+  return (r_par * r_par + r_per * r_per) / 2;
+}
+
+Sample SoT_sample(Collision col, vec2 u)
+{
+  vec3 wo = -col.ray.dir;
+  float cos_o = dot(wo, col.n);
+  float ior_i = col.curr_ior;
+  float ior_t = col.mat.transmittance[3];  // mat IoR
+
+  bool entering = (cos_o > 0);
+  if (!entering) 
+  {
+    float temp = ior_i;
+    ior_i = ior_t;
+    ior_t = ior_i;
+    col.n = col.n * -1;
+    cos_o *= -1;
+  }
+
+  // Snell law to compute cos_o
+  float eta = ior_i / ior_t;
+  float sin2_o = 1 - cos_o * cos_o;
+  float sin2_i = eta * eta * sin2_o;
+  float cos_i = sqrt(1 - sin2_i);
+
+  // Fresnel reflectance
+  float F;
+  if (sin2_i >= 1.f)
+    F = 1.f;
+  else
+    F = fr_dielectric(cos_o, cos_i, ior_i, ior_t);
+
+  // Sample reflecting or transmitted ray with probability based on F 
+  vec3 wi;
+  float pdf;
+  if (u.x < F)
+  {
+    wi = col.n * 2 * cos_o - wo;
+    pdf = F;
+  } 
+  else
+  {
+    wi = wo * - 1 * eta + col.n * (eta * cos_o - cos_i); 
+    pdf = 1 - F;
+    col.transmitted = true;
+  }
+
+  return Sample(wi, abs(cos_i));
+}
+
+Sample sample_bsdf(Collision col)
+{
+  vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
+
+  // Specular / Transmissive only goes in one direction
+  if (col.mat.specular != vec4(0) || col.mat.transmittance.xyz != vec3(0))
+  {
+    return SoT_sample(col, u);
+  }
+  else
+  {
+    return cosine_sample_hemisphere(col.n, u);
+  }
+}
+
 // This is the lambert one only for now
-vec3 evaluate_lambert_bsdf(vec3 wo, vec3 wi, Collision obj_col)
+vec3 evaluate_lambert_bsdf(Collision obj_col)
 {
   //return obj_col.mat.albedo;
   return obj_col.mat.albedo.rgb * INV_PI;
@@ -395,12 +424,23 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
   return color;
 }
 
+vec3 evaluate_sot_bsdf(Collision col)
+{
+  if (col.transmitted)
+    return col.mat.transmittance.xyz; 
+  else
+    return col.mat.specular.xyz;
+}
+
 vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
   //if (obj_col.mat.is_microfacet)
   //  return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
   //else
-  return evaluate_lambert_bsdf(wo, wi, obj_col);
+  if (obj_col.mat.specular != vec4(0) || obj_col.mat.transmittance.xyz != vec3(0))
+    return evaluate_sot_bsdf(obj_col);
+  else
+    return evaluate_lambert_bsdf(obj_col);
 }
 
 
@@ -483,11 +523,13 @@ vec3 pathtrace(Ray ray)
 
   int max_bounces = 8;
   bool specular_bounce = false;
+  float prev_ior = 1.0;
 
   for (int bounces = 0; ; bounces++)
   {
     // Intersect ray with scene
     Collision obj_col = intersect_scene(ray);
+    obj_col.curr_ior = prev_ior;
 
     // Stop if no collision or no more bounce
     if (obj_col.t <= 0 || bounces >= max_bounces)
@@ -513,20 +555,20 @@ vec3 pathtrace(Ray ray)
       }
     }
 
-    // TODO: Compute scattering functions and skip over medium boundaries
-
     // Direct lighting estimation at current path vertex (end of the current path = light)
     L += throughput * uniform_sample_one_light(obj_col);
 
     // Indirect lighting estimation
 
     // Sample the BSDF at intersection to get the new path direction
-    vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
-    Sample bsdf_sample = cosine_sample_hemisphere(obj_col.n, u);
+    Sample bsdf_sample = sample_bsdf(obj_col);
 
     vec3 wi = bsdf_sample.value;
     vec3 wo = -ray.dir;
     vec3 f = evaluate_bsdf(wo, wi, obj_col);
+
+    prev_ior = obj_col.curr_ior;  // update IoR in case medium has changed after updating ray
+    //specular_bounce = obj_col.
 
     // Update how much light is received from next path vertex
     throughput *= f * abs(dot(wi, obj_col.n)) / bsdf_sample.pdf;
@@ -589,6 +631,7 @@ void main()
     res += 1.0 / float(spp) * pathtrace(ray);
   } 
 
+  // Blend only if the camera is static
   vec3 acc_color;
   if (u_is_moving == 1)
   {
