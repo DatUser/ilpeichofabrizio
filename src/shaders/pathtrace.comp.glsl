@@ -466,10 +466,13 @@ Sample area_sample(Triangle t, vec3 origin, inout uint rngState)
 
   vec3 dir = normalize(sample_pt - origin);
 
+
   // Compute area of triangle
   vec3 n = cross(t.p1 - t.p0, t.p2 - t.p0);
-  float area_pdf = 2 / length(n);     // 1/area : uniform sampling over area
 
+  if (dot(dir, n) >= 0) return Sample(dir, 0); 
+  
+  float area_pdf = 2 / length(n);     // 1/area : uniform sampling over area
   return Sample(dir, area_pdf);
 }
 
@@ -488,6 +491,8 @@ vec3 uniform_sample_one_light(Collision obj_col, inout uint rngState)
 
   // Sample a ray direction from light to collision point
   Sample light_sample = area_sample(light, obj_col.p, rngState);
+  if (light_sample.pdf == 0) return vec3(0);
+
   vec3 wi = light_sample.value;
 
   // Cannot sample if surface blocks ray from light
@@ -527,7 +532,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 5;
+  int max_bounces = 8;
   bool specular_bounce = false;
   float prev_ior = 1.0;
 
@@ -569,7 +574,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
 
     // Absorbance using Beer Law (if not set to pure transmission)
     if (prev_ior != 1.0)
-      throughput *= exp(-vec3(8, 10, 5) * obj_col.t);
+      throughput *= exp(-vec3(1, 0.5, 0.2) * obj_col.t);
       //throughput *= exp(-obj_col.mat.transmittance.xyz * obj_col.t);
       //throughput *= exp(-(vec3(1) - obj_col.mat.transmittance.xyz) * obj_col.t);
 
@@ -641,7 +646,7 @@ void main()
 
   // Cast the ray out into the world and intersect the ray with objects
 
-  int spp = u_is_moving == 1 ? 1 : 1;
+  int spp = u_is_moving == 1 ? 1 : 16;
   vec3 res = vec3(0);
   for (int i = 0; i < spp; i++)
   {

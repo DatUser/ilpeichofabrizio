@@ -18,6 +18,24 @@ newmtl leftWall
   Ks 0 0 0
   Ke 0 0 0
 
+newmtl leftLight1
+  Ns 10.0000
+  Ni 1.0000
+  illum 2
+  Ka 0.9 0.78 0.1 # White
+  Kd 0.9 0.78 0.1
+  Ks 0 0 0
+  Ke 40 34 5
+
+newmtl leftLight2
+  Ns 10.0000
+  Ni 1.0000
+  illum 2
+  Ka 0.11 0.78 0.9 # White
+  Kd 0.11 0.78 0.9
+  Ks 0 0 0
+  Ke 5 34 40
+
 
 newmtl rightWall
   Ns 10.0000
@@ -61,11 +79,11 @@ newmtl backWall
 
 newmtl shortBox
   Ns 10.0000
-  Ni 1
+  Ni 1.125
   illum 2
   Ka 0.725 0.71 0.68 # White
   Kd 0.725 0.71 0.68
-  Ks 0 0 0
+  Ks 1 1 1
   Kt 0 0 0 
   
 

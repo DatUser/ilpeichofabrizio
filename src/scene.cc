@@ -65,8 +65,8 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
       glm::vec4(mtl.specular[0], mtl.specular[1], mtl.specular[2], 0.0),                      // ks
       glm::vec4(mtl.transmittance[0], mtl.transmittance[1], mtl.transmittance[2], mtl.ior)    // kt + ior
     });
-    std::cout << mtl.specular[0] << " " <<  mtl.specular[1] << " " << mtl.specular[2] << std::endl;    // kt + ior
-    std::cout << mtl.transmittance[0] << " " <<  mtl.transmittance[1] << " " << mtl.transmittance[2] << std::endl;    // kt + ior
+    //std::cout << mtl.specular[0] << " " <<  mtl.specular[1] << " " << mtl.specular[2] << std::endl;    // kt + ior
+    //std::cout << mtl.transmittance[0] << " " <<  mtl.transmittance[1] << " " << mtl.transmittance[2] << std::endl;    // kt + ior
   }
 
   std::cout << "Material parsed" << std::endl;
@@ -75,9 +75,9 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
   for (size_t i = 0; i < attrib.vertices.size(); i++)
   {
     Vertex vertex(
-      attrib.vertices[3 * i],
-      attrib.vertices[3 * i + 1],
-      attrib.vertices[3 * i + 2],
+      attrib.vertices[3 * i] * scale + translation.x,
+      attrib.vertices[3 * i + 1] * scale + translation.y,
+      attrib.vertices[3 * i + 2] * scale + translation.z,
       0.f
     );
     vertices_.push_back(vertex);
