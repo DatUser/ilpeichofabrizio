@@ -96,9 +96,6 @@ struct Sample
 // *                                 SCENE                                     *
 // *****************************************************************************
 
-float camera_pos_z = 3.0;
-
-
 Collision collisions[42];
 
 vec3 ambient = vec3(0.05, 0.05, 0.05);
@@ -107,8 +104,6 @@ vec3 ambient = vec3(0.05, 0.05, 0.05);
 // *****************************************************************************
 // *                                 UTILS                                     *
 // *****************************************************************************
-
-uint rngState;
 
 uint wang_hash(inout uint seed)
 {
@@ -122,7 +117,7 @@ uint wang_hash(inout uint seed)
 
 float RandomFloat01(inout uint state)
 {
-    return float(wang_hash(state)) / 4294967296.0;
+  return float(wang_hash(state)) / 4294967296.0;
 }
 vec3 local_to_world(vec3 local_dir, vec3 normal)
 {
@@ -284,7 +279,7 @@ float fr_dielectric(float cos_i, float cos_t, float ior_i, float ior_t) {
   return (r_par * r_par + r_per * r_per) / 2;
 }
 
-Sample SoT_sample(Collision col, vec2 u)
+Sample SoT_sample(inout Collision col, vec2 u)
 {
   vec3 wo = -col.ray.dir;
   float cos_o = dot(wo, col.n);
@@ -327,13 +322,15 @@ Sample SoT_sample(Collision col, vec2 u)
     wi = wo * - 1 * eta + col.n * (eta * cos_o - cos_i); 
     pdf = 1 - F;
     col.transmitted = true;
+    col.curr_ior = ior_t;
   }
 
   return Sample(wi, abs(cos_i));
 }
 
-Sample sample_bsdf(Collision col)
+Sample sample_bsdf(inout Collision col, inout uint rngState)
 {
+
   vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
 
   // WARNING : not so sure about that -> reverse n when need to sample the other way
@@ -432,7 +429,8 @@ vec3 evaluate_cook_torrance_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 vec3 evaluate_sot_bsdf(Collision col)
 {
   if (col.transmitted)
-    return col.mat.transmittance.xyz; 
+    return vec3(1);
+    //return col.mat.transmittance.xyz; 
   else
     return col.mat.specular.xyz;
 }
@@ -459,7 +457,7 @@ vec2 uniform_sample_triangle(vec2 u)
   return vec2(1 - su0, u.y * su0);
 }
 
-Sample area_sample(Triangle t, vec3 origin)
+Sample area_sample(Triangle t, vec3 origin, inout uint rngState)
 {
   vec2 u = vec2(RandomFloat01(rngState), RandomFloat01(rngState));
   vec2 b = uniform_sample_triangle(u);
@@ -476,7 +474,7 @@ Sample area_sample(Triangle t, vec3 origin)
 }
 
 // *** NOTE *** : Multiple Importance Sampling (MIS) could be added here
-vec3 uniform_sample_one_light(Collision obj_col)
+vec3 uniform_sample_one_light(Collision obj_col, inout uint rngState)
 {
   // TODO: pick random light
   int rand_i = int(RandomFloat01(rngState) * lights.length());
@@ -489,7 +487,7 @@ vec3 uniform_sample_one_light(Collision obj_col)
   light.mat = mats[l_ref.mat_id];
 
   // Sample a ray direction from light to collision point
-  Sample light_sample = area_sample(light, obj_col.p);
+  Sample light_sample = area_sample(light, obj_col.p, rngState);
   vec3 wi = light_sample.value;
 
   // Cannot sample if surface blocks ray from light
@@ -524,12 +522,12 @@ vec3 uniform_sample_one_light(Collision obj_col)
 // *                               MAIN                                        *
 // *****************************************************************************
 
-vec3 pathtrace(Ray ray)
+vec3 pathtrace(Ray ray, inout uint rngState)
 {
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 15;
+  int max_bounces = 5;
   bool specular_bounce = false;
   float prev_ior = 1.0;
 
@@ -552,7 +550,7 @@ vec3 pathtrace(Ray ray)
     // Other cases are handled by direct lighting estimation
     if (bounces == 0)
     {
-      if (obj_col.t > 0 || specular_bounce)
+      if (obj_col.t > 0)
       {
         L += throughput * obj_col.mat.emission.rgb;
       }
@@ -564,15 +562,23 @@ vec3 pathtrace(Ray ray)
     }
 
     specular_bounce = (obj_col.transmitted || obj_col.mat.specular != vec4(0));
-    
+
     // Direct lighting estimation at current path vertex (end of the current path = light)
     if (!specular_bounce)
-      L += throughput * uniform_sample_one_light(obj_col);
+      L += throughput * uniform_sample_one_light(obj_col, rngState);
+
+    // Absorbance using Beer Law (if not set to pure transmission)
+    if (prev_ior != 1.0)
+      throughput *= exp(-vec3(8, 10, 5) * obj_col.t);
+      //throughput *= exp(-obj_col.mat.transmittance.xyz * obj_col.t);
+      //throughput *= exp(-(vec3(1) - obj_col.mat.transmittance.xyz) * obj_col.t);
 
     // Indirect lighting estimation
 
     // Sample the BSDF at intersection to get the new path direction
-    Sample bsdf_sample = sample_bsdf(obj_col);
+    Sample bsdf_sample = sample_bsdf(obj_col, rngState);
+
+    //if (obj_col.transmitted) return vec3(1, 0, 0);
 
     vec3 wi = bsdf_sample.value;
     vec3 wo = -ray.dir;
@@ -603,7 +609,7 @@ vec3 pathtrace(Ray ray)
 
 void main()
 {
-  rngState = uint(uint(gl_GlobalInvocationID.x) * uint(1973)
+  uint rngState = uint(uint(gl_GlobalInvocationID.x) * uint(1973)
     + uint(gl_GlobalInvocationID.y) * uint(9277)
     + uint(u_frame) * uint(26699)) | uint(1);
 
@@ -634,11 +640,12 @@ void main()
   ray.dir = normalize(pixel_world.xyz - ray.origin);
 
   // Cast the ray out into the world and intersect the ray with objects
-  int spp = 1;
+
+  int spp = u_is_moving == 1 ? 1 : 1;
   vec3 res = vec3(0);
   for (int i = 0; i < spp; i++)
   {
-    res += 1.0 / float(spp) * pathtrace(ray);
+    res += 1.0 / float(spp) * pathtrace(ray, rngState);
   } 
 
   // Blend only if the camera is static
@@ -657,6 +664,7 @@ void main()
       blend
     );
   }
+
 
   imageStore(new_frame, pixel, vec4(acc_color.xyz, 1.0));
 
