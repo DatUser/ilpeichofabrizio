@@ -6,6 +6,16 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
+std::vector<Triangle> BtriToTri(std::vector<BVHTriangle>& btris)
+{
+  std::vector<Triangle> tris;
+
+  for (auto btri : btris)
+    tris.push_back(btri.triangle);
+
+  return tris;
+}
+
 Scene::Scene(const std::string& path)
 {
   std::ifstream file(path);
@@ -16,27 +26,47 @@ Scene::Scene(const std::string& path)
   }
 
   json j = json::parse(file);
-  parse_scene(j);
+  auto btris_bounds = parse_scene(j);
+  auto btris = btris_bounds.first;
+  auto bounds = btris_bounds.second;
+  std::vector<BVHNode> tree;
 
-  build_bvh();
+  build_bvh(btris, bounds, 0, btris.size(), tree);
+  triangles_ = BtriToTri(btris);
 }
 
-void Scene::parse_scene(json j)
+std::pair<std::vector<BVHTriangle>, Box> Scene::parse_scene(json j)
 {
-  for (auto const& j_mod : j.at("models"))
-  {
-    auto obj_file = j_mod.at("objFile").get<std::string>();
-    auto mtl_basedir = j_mod.at("mtlBasedir").get<std::string>();
-    auto scale = j_mod.at("scale").get<float>();
-    auto t = j_mod.at("translation").get<std::array<float, 3>>();
-    glm::vec3 translation = glm::vec3(t[0], t[1], t[2]);
+  //for (auto const& j_mod : j.at("models"))
+  //{
+  auto j_mod = j.at("models");
+  auto obj_file = j_mod.at("objFile").get<std::string>();
+  auto mtl_basedir = j_mod.at("mtlBasedir").get<std::string>();
+  auto scale = j_mod.at("scale").get<float>();
+  auto t = j_mod.at("translation").get<std::array<float, 3>>();
+  Vertex3 translation = Vertex3(t[0], t[1], t[2]);
 
-    // Read obj file and add triangles
-    load_model(obj_file, mtl_basedir, scale, translation);
-  }
+  // Read obj file and add triangles
+  return load_model(obj_file, mtl_basedir, scale, translation);
+  //}
 }
 
-void Scene::load_model(const std::string& obj_file, const std::string& mtl_basedir,
+Vertex3 minimize(const Vertex3& a, const Vertex3& b)
+{
+  return Vertex3(std::min(a[0], b[0]),
+                    std::min(a[1], b[1]),
+                    std::min(a[2], a[2]));
+}
+
+Vertex3 maximize(const Vertex3& a, const Vertex3& b)
+{
+  return Vertex3(std::max(a[0], b[0]),
+                    std::max(a[1], b[1]),
+                    std::max(a[2], a[2]));
+}
+
+ std::pair<std::vector<BVHTriangle>, Box> Scene::load_model(
+            const std::string& obj_file, const std::string& mtl_basedir,
                        float scale, const glm::vec3& translation)
 {
   tinyobj::attrib_t attrib;
@@ -71,6 +101,9 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
 
   std::cout << "Material parsed" << std::endl;
 
+  Vertex3 bmin = Vertex3(std::numeric_limits<float>::max());
+  Vertex3 bmax = Vertex3(std::numeric_limits<float>::min());
+
   // Vertices
   for (size_t i = 0; i < attrib.vertices.size(); i++)
   {
@@ -81,9 +114,15 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
       0.f
     );
     vertices_.push_back(vertex);
+
+    Vertex3 v3 = vertex.xyz();
+    bmin = minimize(v3, bmin);
+    bmax = maximize(v3, bmax);
   }
 
   std::cout << "Vertices parsed" << std::endl;
+
+  std::vector<BVHTriangle> btris;
 
   // Triangles
   for (const auto& shape : shapes)
@@ -96,21 +135,29 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
       Triangle triangle;
       triangle.mat_id = shape.mesh.material_ids[i_face];
 
+      //Actual vertices for BVH triangle
+      Vertex3 verts[3];
       // Iterate inside of triangles
       for (size_t v = 0; v < face_v; ++v)
       {
         size_t idx = shape.mesh.indices[idx_offset + v].vertex_index;
-        triangle.vertices_index[v] = idx; 
-
+        triangle.vertices_index[v] = idx;
+        verts[v] = vertices_[idx].xyz();
       }
-      
+
+      Vertex3 bmin_tri = minimize(minimize(verts[0], verts[1]), verts[2]);
+      Vertex3 bmax_tri = maximize(maximize(verts[0], verts[1]), verts[2]);
+      Box bounds = { bmin_tri, bmax_tri };
+      BVHTriangle btri(verts, bounds, triangle);
+      btris.push_back(btri);
+
       if (triangle.mat_id != -1 && materials_[triangle.mat_id].ke != glm::vec4(0.f))
       {
         lights_.push_back(triangle);
       }
 
 
-      triangles_.push_back(triangle);
+      //triangles_.push_back(triangle);
       idx_offset += face_v;
       i_face++;
     }
@@ -128,11 +175,130 @@ void Scene::load_model(const std::string& obj_file, const std::string& mtl_based
   std::cout << "Pos size: " << attrib.vertices.size() << std::endl;
   std::cout << "Norm size: " << attrib.normals.size() << std::endl;
   std::cout << "Tex size: " << attrib.texcoords.size() << std::endl;
+
+  return { btris , { bmin, bmax }};
 }
 
-
-
-void Scene::build_bvh()
+Box group(const Box& b1, const Box& b2)
 {
+  return { minimize(b1.bmin, b2.bmin), maximize(b1.bmax, b2.bmax) };
+}
 
+//We consider the axis with largest gap the "best axis"
+//sensible to edge cases
+int get_best_axis(Box& box)
+{
+  Vertex3 diff = box.bmax - box.bmin;
+  int max = std::max(std::max(diff[0], diff[1]), diff[2]);
+
+  if (max == diff[0])
+    return 0;
+  if (max == diff[1])
+    return 1;
+
+  return 2;
+}
+
+float area(Box& box)
+{
+  Vertex3 diff = box.bmax - box.bmin;
+  return diff[0] * diff[1] * diff[2];
+}
+
+//taabb time for intersection between ray and box
+//ttri time for intersection between ray and tri
+float SAH(float taabb, float ttri, Box& bounds, Box& boundsL, int ntrisL,
+          Box& boundsR, int ntrisR)
+{
+  float aBounds = area(bounds);
+  return 2 * taabb + area(boundsL) / aBounds * ntrisL * ttri
+                  + area(boundsR) /  aBounds * ntrisR * ttri;
+}
+
+//Box BtriToBox(BVHTriangle& btri)
+//{
+//  return {
+//    .bmin=(minimize(minimize(btri.verts[0], btri.verts[1]), btri.verts[2])),
+//    .bmax=(maximize(maximize(btri.verts[0], btri.verts[1]), btri.verts[2]))
+//  };
+//}
+
+Vertex3 compute_bmaxL(Box& bounds, Box& boundsR, int axis)
+{
+  if (axis == 0)
+    return Vertex3(boundsR.bmin[0], bounds.bmax[1], bounds.bmax[2]);
+  if (axis == 1)
+    return Vertex3(bounds.bmax[0], boundsR.bmin[1], bounds.bmax[2]);
+
+  return Vertex3(bounds.bmax[0], bounds.bmax[1], boundsR.bmin[2]);
+}
+
+//We consider time to build a triangle is 1
+//We will make further experiences later
+float taabb = 1;
+float ttri = 1.2;
+void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, int end,
+                      std::vector<BVHNode>& tree)
+{
+  //Purpose of this algorithm is build an optimized BVH
+  //based on time to calcutate intersection with triangle and plane
+  float best_cost = ttri * tris.size();
+  int best_axis = -1;
+  int best_event = -1;
+
+  //Find best axis
+  int axis = get_best_axis(bounds);
+  
+  //Sort using best axis
+  if (axis == 0)// X 
+    //Could be replaced by qsort
+    std::sort(tris.begin() + begin, tris.begin() + end, vertexX);
+  else if (axis == 1)// Y 
+    //Could be replaced by qsort
+    std::sort(tris.begin() + begin, tris.begin() + end, vertexY);
+  else// Z 
+    //Could be replaced by qsort
+    std::sort(tris.begin() + begin, tris.begin() + end, vertexZ);
+
+  std::vector<float> left_area;
+  std::vector<float> right_area;
+
+  //left_area.push_back(std::numeric_limits<float>::max())
+  Box left_box = tris[begin].bounds;
+  for (int i = begin; i < end; ++i)
+  {
+    left_box = group(left_box, tris[i].bounds);
+    left_area.push_back(area(left_box));
+  }
+
+  Box right_box = tris[end - 1].bounds;
+  float cost = best_cost;
+  for (int i = end - 1; i > begin; --i)
+  {
+    right_box = group(right_box, tris[i].bounds);
+    Vertex3 bmaxL = compute_bmaxL(bounds, right_box, axis);
+    left_box = { bounds.bmin, bmaxL };
+    cost = SAH(taabb, ttri, bounds, left_box, i, right_box, end - i);
+
+    if (cost < best_cost)
+    {
+      best_cost = cost;
+      best_event = i;
+    }
+  }
+
+  if (best_event == -1) //then {found no partition better than leaf}
+  {
+    BVHNode node = { bounds.bmin, begin, bounds.bmax, end - begin };
+    tree.push_back(node);
+  }
+  else
+  {
+    BVHNode node = { bounds.bmin, tree.size(), bounds.bmax, 0 };
+    tree.push_back(node);
+
+    int mid = begin + (end - begin) / 2;
+    build_bvh(tris, left_box, begin, mid, tree);
+    build_bvh(tris, right_box, mid, end, tree);
+  }
 }
