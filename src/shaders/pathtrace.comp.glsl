@@ -319,7 +319,7 @@ Collision intersect_bvh(Ray ray)
       continue;
 
     // Leaf node -> find nearest intersection in list of triangle
-    if (node.count != -1)
+    if (node.count != 0)
     {
       nearest_triangle(node, ray, col, min_col);
     }
