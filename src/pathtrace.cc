@@ -18,7 +18,7 @@
 
 #include <imgui.h>
 #include "../bindings/imgui_impl_opengl3.h"
-#include "../bindings/imgui_impl_glut.h"
+//#include "../bindings/imgui_impl_glut.h"
 
 #include "program.hh"
 #include "sphere.hh"
@@ -45,6 +45,7 @@ GLuint matSSBO;
 GLuint vertexSSBO;
 GLuint triangleSSBO;
 GLuint lightsSSBO;
+GLuint bvhSSBO;
 
 int width = 1024;
 int height = 1024;
@@ -237,6 +238,8 @@ void display()
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vertexSSBO);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, triangleSSBO);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightsSSBO);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, bvhSSBO);
+
 
   glDispatchCompute(workGroupsX, workGroupsY, workGroupsZ);
   glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -388,6 +391,11 @@ int main(int argc, char** argv)
   glGenBuffers(1, &lightsSSBO);
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsSSBO);
   glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * scene.get_lights().size(), &scene.get_lights()[0], GL_STATIC_DRAW);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+  glGenBuffers(1, &bvhSSBO);
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, bvhSSBO);
+  glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(BVHNode) * scene.get_bvh().size(), &scene.get_bvh()[0], GL_STATIC_DRAW);
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 
