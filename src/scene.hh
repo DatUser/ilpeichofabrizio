@@ -97,7 +97,7 @@ class Scene
     load_model(const std::string& obj_file, const std::string& mtl_basedir,
                     float scale, const glm::vec3& translation);
     void build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, int end,
-                  std::vector<BVHNode>& tree);
+                  std::vector<BVHNode>& tree, int idx);
 
     std::vector<Vertex> vertices_;
     std::vector<Material> materials_;  

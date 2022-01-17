@@ -31,7 +31,8 @@ Scene::Scene(const std::string& path)
   auto bounds = btris_bounds.second;
   std::vector<BVHNode> tree;
 
-  build_bvh(btris, bounds, 0, btris.size(), tree);
+  build_bvh(btris, bounds, 0, btris.size(), tree, 0);
+  bvh_ = tree;
   triangles_ = BtriToTri(btris);
 }
 
@@ -55,14 +56,14 @@ Vertex3 minimize(const Vertex3& a, const Vertex3& b)
 {
   return Vertex3(std::min(a[0], b[0]),
                     std::min(a[1], b[1]),
-                    std::min(a[2], a[2]));
+                    std::min(a[2], b[2]));
 }
 
 Vertex3 maximize(const Vertex3& a, const Vertex3& b)
 {
   return Vertex3(std::max(a[0], b[0]),
                     std::max(a[1], b[1]),
-                    std::max(a[2], a[2]));
+                    std::max(a[2], b[2]));
 }
 
  std::pair<std::vector<BVHTriangle>, Box> Scene::load_model(
@@ -105,12 +106,12 @@ Vertex3 maximize(const Vertex3& a, const Vertex3& b)
   Vertex3 bmax = Vertex3(std::numeric_limits<float>::min());
 
   // Vertices
-  for (size_t i = 0; i < attrib.vertices.size(); i++)
+  for (size_t i = 0; i < attrib.vertices.size(); i+=3)
   {
     Vertex vertex(
-      attrib.vertices[3 * i] * scale + translation.x,
-      attrib.vertices[3 * i + 1] * scale + translation.y,
-      attrib.vertices[3 * i + 2] * scale + translation.z,
+      attrib.vertices[i] * scale + translation.x,
+      attrib.vertices[i + 1] * scale + translation.y,
+      attrib.vertices[i + 2] * scale + translation.z,
       0.f
     );
     vertices_.push_back(vertex);
@@ -176,6 +177,8 @@ Vertex3 maximize(const Vertex3& a, const Vertex3& b)
   std::cout << "Norm size: " << attrib.normals.size() << std::endl;
   std::cout << "Tex size: " << attrib.texcoords.size() << std::endl;
 
+  //std::cout << "Bounds are bmin: (" << bmin[0] << ", " << bmin[1] << ", " << bmin[2] << ")\n";
+  //std::cout << "Bounds are bmax: (" << bmax[0] << ", " << bmax[1] << ", " << bmax[2] << ")\n";
   return { btris , { bmin, bmax }};
 }
 
@@ -238,7 +241,7 @@ Vertex3 compute_bmaxL(Box& bounds, Box& boundsR, int axis)
 float taabb = 1;
 float ttri = 1.2;
 void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, int end,
-                      std::vector<BVHNode>& tree)
+                      std::vector<BVHNode>& tree, int idx)
 {
   //Purpose of this algorithm is build an optimized BVH
   //based on time to calcutate intersection with triangle and plane
@@ -287,18 +290,22 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
     }
   }
 
+  if (tree.size() <= idx)
+    tree.resize(idx + 1);
   if (best_event == -1) //then {found no partition better than leaf}
   {
     BVHNode node = { bounds.bmin, begin, bounds.bmax, end - begin };
-    tree.push_back(node);
+    tree[idx] = node;
+    //tree.push_back(node);
   }
   else
   {
-    BVHNode node = { bounds.bmin, tree.size(), bounds.bmax, 0 };
-    tree.push_back(node);
+    BVHNode node = { bounds.bmin, 2 * idx + 1/*tree.size()*/, bounds.bmax, 0 };
+    tree[idx] = node;
+    //tree.push_back(node);
 
     int mid = begin + (end - begin) / 2;
-    build_bvh(tris, left_box, begin, mid, tree);
-    build_bvh(tris, right_box, mid, end, tree);
+    build_bvh(tris, left_box, begin, mid, tree, 2 * idx + 1);
+    build_bvh(tris, right_box, mid, end, tree, 2 * idx + 2);
   }
 }
