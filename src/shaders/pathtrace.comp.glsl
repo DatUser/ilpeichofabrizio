@@ -29,6 +29,16 @@ struct TriangleI
 layout (std430, binding=5) buffer triangle_buffer { TriangleI triangles[]; };
 layout (std430, binding=6) buffer lights_buffer { TriangleI lights[]; };
 
+struct BVHNode
+{
+  vec3 box_min;
+  uint left_child;
+  vec3 box_max;
+  uint count;
+};
+
+layout (std430, binding=7) buffer tree_buffer { BVHNode tree[]; };
+
 
 uniform int u_frame;
 uniform int u_is_moving;
@@ -209,13 +219,31 @@ Collision collision(Triangle triangle, Ray ray)
   return obj_col;
 }
 
-Collision intersect_scene(Ray ray)
+bool intersect_box(Ray ray, vec3 box_min, vec3 box_max, float tmin, float tmax)
 {
-  // Initial null collision
-  Collision min_col;
-  min_col.t = -1;
+  for (int a = 0; a < 3; a++)
+  {
+    float invD = 1.f / ray.dir[a];
+    float t0 = (box_min[a] - ray.origin[a]) * invD;
+    float t1 = (box_max[a] - ray.origin[a]) * invD;
+    if (invD < 0.f) {
+      float temp = t0;
+      t0 = t1;
+      t1 = temp;
+    }
 
-  for (int i = 0; i < triangles.length(); ++i)
+    tmin = t0 > tmin ? t0 : tmin;
+    tmax = t1 < tmax ? t1 : tmax;
+
+    if (tmin > tmax) return false;
+  }
+
+  return true;
+}
+
+void nearest_triangle(BVHNode node, Ray ray, inout Collision col, inout Collision min_col)
+{
+  for (int i = 0; i < node.count; ++i)
   {
     TriangleI t_ref = triangles[i];
 
@@ -225,7 +253,7 @@ Collision intersect_scene(Ray ray)
     triangle.p2 = vertices[int(t_ref.vertices_index.z)].xyz;
     triangle.mat = mats[t_ref.mat_id];
 
-    Collision col = collision(triangle, ray);
+    col = collision(triangle, ray);
 
     // Not found collision yet or new collision is nearer
     if (min_col.t == -1 || (col.t > 0 && min_col.t > col.t))
@@ -233,6 +261,77 @@ Collision intersect_scene(Ray ray)
       min_col = col;
     }
   }
+}
+
+
+// *****************************************************************************
+// *                                 BVH                                      *
+// *****************************************************************************
+
+int stack[64];
+int index = -1;
+int stack_len = 0;
+
+BVHNode stack_pop()
+{
+  int node_i = stack[index];
+  index--;
+  stack_len--;
+  return tree[node_i];
+}
+
+void stack_push(int node_i)
+{
+  index++;
+  stack_len++;
+  stack[index] = node_i;
+}
+
+bool stack_is_empty()
+{
+  return stack_len == 0;
+}
+
+void stack_clear()
+{
+  index = -1;
+  stack_len = 0;
+}
+
+Collision intersect_bvh(Ray ray)
+{
+  Collision col;
+  col.t = -1;
+  Collision min_col;
+  min_col.t = -1;
+
+  stack_clear();
+  stack_push(0); // push root
+
+  float tmin = 0.001;
+  float tmax = 1.0 / 0.0;
+
+  while (!stack_is_empty())
+  {
+    BVHNode node = stack_pop();
+
+    if (!intersect_box(ray, node.box_min, node.box_max, tmin, col.t != -1 ? col.t : tmax))
+      continue;
+
+    // Leaf node -> find nearest intersection in list of triangle
+    if (node.count != -1)
+    {
+      nearest_triangle(node, ray, col, min_col);
+    }
+    // Internal node -> continue traversing internal boxes
+    else
+    {
+      stack_push(int(node.left_child) + 1);  // push right child
+      stack_push(int(node.left_child));      // push left child
+    }
+
+  }
+
   return min_col;
 }
 
@@ -504,7 +603,7 @@ vec3 uniform_sample_one_light(Collision obj_col, inout uint rngState)
     wi
   );
 
-  Collision light_col = intersect_scene(ray_in);
+  Collision light_col = intersect_bvh(ray_in);
 
   // Discard if no hit or hit non mats[1] object 
   if (light_col.t <= 0 || light_col.mat.emission.rgb == vec3(0)) return vec3(0);
@@ -539,7 +638,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
   for (int bounces = 0; ; bounces++)
   {
     // Intersect ray with scene
-    Collision obj_col = intersect_scene(ray);
+    Collision obj_col = intersect_bvh(ray);
     obj_col.curr_ior = prev_ior;
 
     // Stop if no collision or no more bounce
@@ -606,7 +705,6 @@ vec3 pathtrace(Ray ray, inout uint rngState)
 
     // Add the energy we 'lose' by randomly terminating paths
     throughput *= 1.0f / p;            
-
   }
 
   return L;
@@ -646,7 +744,7 @@ void main()
 
   // Cast the ray out into the world and intersect the ray with objects
 
-  int spp = u_is_moving == 1 ? 1 : 16;
+  int spp = u_is_moving == 1 ? 1 : 1;
   vec3 res = vec3(0);
   for (int i = 0; i < spp; i++)
   {
