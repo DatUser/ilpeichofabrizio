@@ -1,11 +1,10 @@
 {
-  "models": [
+  "models":
     {
-      "objFile": "../assets/CornellBox-lights.obj",
+      "objFile": "../assets/CornellBox-Original.obj",
       "mtlBasedir": "../assets/",
       "scale": 1,
       "translation": [0, 0, 0]
     }
-  ]
 
 }
