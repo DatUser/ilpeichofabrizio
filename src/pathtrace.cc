@@ -79,6 +79,49 @@ glm::vec3 cameraFront;
 glm::vec3 cameraPos   = glm::vec3(0, 1.0f, 4.0f);
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
+void write_node_label(const std::vector<BVHNode>& tree, int node_id,
+    std::ofstream& file)
+{
+  Vertex3 bmin = tree[node_id].box_min;
+  Vertex3 bmax = tree[node_id].box_max;
+  file << node_id << " [label=\"";
+  file << "bmin: (" << bmin[0] << ", " << bmin[1] << ", " << bmin[2] << ")\\n";
+  file << "bmax: (" << bmax[0] << ", " << bmax[1] << ", " << bmax[2] << ")";
+  file << "\"];" << std::endl;
+
+  if (!tree[node_id].num_triangles)
+  {
+    int left = tree[node_id].firstChildNodeID;
+    write_node_label(tree, left, file);
+    write_node_label(tree, left + 1, file);
+  }
+}
+
+void write_node(const std::vector<BVHNode>& tree, int node_id, std::ofstream& file)
+{
+  //Inner nodes have 0 in num triangles
+  if (!tree[node_id].num_triangles)
+  {
+    int left = tree[node_id].firstChildNodeID;
+    file << node_id << " -> " << left << std::endl;
+    file << node_id << " -> " << left + 1 << std::endl;
+    write_node(tree, left, file);
+    write_node(tree, left + 1, file);
+  }
+}
+
+void treeToDot(const std::vector<BVHNode>& tree)
+{
+  std::ofstream file;
+  file.open("tree.dot");
+
+  file << "digraph tree {" << std::endl;
+  write_node(tree, 0, file);
+  write_node_label(tree, 0, file);
+  file << "}" << std::endl;
+
+  file.close();  
+}
 
 void mouseFunc(int glut_button, int state, int x, int y)
 {
@@ -437,6 +480,10 @@ int main(int argc, char** argv)
   display_shader = program::make_program(display_files);
   std::cout << "Display shader compiled" << std::endl;
 
+  std::cout << "BVH size: " << scene.get_bvh().size() << std::endl;
+  std::cout << "NB triangles: " << scene.get_triangles().size() << std::endl;
+  
+  //treeToDot(scene.get_bvh());
   glutMainLoop();
 
   delete pathtrace_shader;

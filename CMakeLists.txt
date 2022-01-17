@@ -4,9 +4,9 @@ set(CMAKE_CXX_COMPILER /usr/bin/clang++ CACHE PATH "")
 cmake_minimum_required(VERSION 3.12)
 project(main)
 
-set(OPT_FLAGS
-    "-Ofast -mtune=native -floop-parallelize-all -fgcse-sm"
-)
+#set(OPT_FLAGS
+#    "-Ofast -mtune=native -floop-parallelize-all -fgcse-sm"
+#)
 
 
 # Directories containing headers must be specified in the include_directories()
@@ -26,7 +26,7 @@ file(GLOB_RECURSE BINDINGS "bindings/*.cpp")
 set(CMAKE_CXX_STANDARD 17)
 
 if (UNIX)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic -fopenmp -lGL -lGLU -lglut -lGLEW")#Werror
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_FLAGS} -g -Wall -Wextra -pedantic -fopenmp -lGL -lGLU -lglut -lGLEW")#Werror
 endif(UNIX)
 if (APPLE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic")#Werror
