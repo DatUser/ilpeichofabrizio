@@ -1,0 +1,18 @@
+{
+  "camera": [0, 10, 45],
+  "models":
+  [
+    {
+      "objFile": "../assets/CornellBox-empty.obj",
+      "mtlBasedir": "../assets/",
+      "scale": 10,
+      "translation": [0, 0, 0]
+    },
+    {
+      "objFile": "../assets/small.obj",
+      "mtlBasedir": "../assets/",
+      "scale": 1,
+      "translation": [0, 0, 0]
+    }
+  ]
+}
