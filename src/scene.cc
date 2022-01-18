@@ -36,22 +36,6 @@ Scene::Scene(const std::string& path)
   triangles_ = BtriToTri(btris);
 }
 
-std::pair<std::vector<BVHTriangle>, Box> Scene::parse_scene(json j)
-{
-  //for (auto const& j_mod : j.at("models"))
-  //{
-  auto j_mod = j.at("models");
-  auto obj_file = j_mod.at("objFile").get<std::string>();
-  auto mtl_basedir = j_mod.at("mtlBasedir").get<std::string>();
-  auto scale = j_mod.at("scale").get<float>();
-  auto t = j_mod.at("translation").get<std::array<float, 3>>();
-  Vertex3 translation = Vertex3(t[0], t[1], t[2]);
-
-  // Read obj file and add triangles
-  return load_model(obj_file, mtl_basedir, scale, translation);
-  //}
-}
-
 Vertex3 minimize(const Vertex3& a, const Vertex3& b)
 {
   return Vertex3(std::min(a[0], b[0]),
@@ -66,119 +50,130 @@ Vertex3 maximize(const Vertex3& a, const Vertex3& b)
                     std::max(a[2], b[2]));
 }
 
- std::pair<std::vector<BVHTriangle>, Box> Scene::load_model(
-            const std::string& obj_file, const std::string& mtl_basedir,
-                       float scale, const glm::vec3& translation)
+std::pair<std::vector<BVHTriangle>, Box> Scene::parse_scene(json j)
 {
-  tinyobj::attrib_t attrib;
-  std::vector<tinyobj::shape_t> shapes;
-  std::vector<tinyobj::material_t> mtls;
-
-  std::string err;
-  
-  const char* mtl_basedir_cstr = (mtl_basedir.empty()) 
-    ? NULL
-    : mtl_basedir.c_str();
-  
-  bool ret = tinyobj::LoadObj(&attrib, &shapes, &mtls, &err,
-                              obj_file.c_str(), mtl_basedir_cstr);
-
-  if (!err.empty()) std::cerr << err << std::endl;
-
-  if (!ret) std::cerr << "Model file could not be parsed !" << std::endl;
-  else std::cout << "Model successfully loaded !" << std::endl;
-
-  // Materials
-  for (const auto& mtl : mtls) {
-    materials_.push_back({
-      glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 0.0),                         // kd
-      glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 0.0),                      // ke
-      glm::vec4(mtl.specular[0], mtl.specular[1], mtl.specular[2], 0.0),                      // ks
-      glm::vec4(mtl.transmittance[0], mtl.transmittance[1], mtl.transmittance[2], mtl.ior)    // kt + ior
-    });
-    //std::cout << mtl.specular[0] << " " <<  mtl.specular[1] << " " << mtl.specular[2] << std::endl;    // kt + ior
-    //std::cout << mtl.transmittance[0] << " " <<  mtl.transmittance[1] << " " << mtl.transmittance[2] << std::endl;    // kt + ior
-  }
-
-  std::cout << "Material parsed" << std::endl;
 
   Vertex3 bmin = Vertex3(std::numeric_limits<float>::max());
   Vertex3 bmax = Vertex3(std::numeric_limits<float>::min());
 
-  // Vertices
-  for (size_t i = 0; i < attrib.vertices.size(); i+=3)
-  {
-    Vertex vertex(
-      attrib.vertices[i] * scale + translation.x,
-      attrib.vertices[i + 1] * scale + translation.y,
-      attrib.vertices[i + 2] * scale + translation.z,
-      0.f
-    );
-    vertices_.push_back(vertex);
-
-    Vertex3 v3 = vertex.xyz();
-    bmin = minimize(v3, bmin);
-    bmax = maximize(v3, bmax);
-  }
-
-  std::cout << "Vertices parsed" << std::endl;
-
   std::vector<BVHTriangle> btris;
 
-  // Triangles
-  for (const auto& shape : shapes)
+  for (auto const& j_mod : j.at("models"))
   {
-    // Iterate through triangles
-    size_t idx_offset = 0;
-    size_t i_face = 0;
-    for (size_t face_v : shape.mesh.num_face_vertices)
-    {
-      Triangle triangle;
-      triangle.mat_id = shape.mesh.material_ids[i_face];
+    auto obj_file = j_mod.at("objFile").get<std::string>();
+    auto mtl_basedir = j_mod.at("mtlBasedir").get<std::string>();
+    auto scale = j_mod.at("scale").get<float>();
+    auto t = j_mod.at("translation").get<std::array<float, 3>>();
+    Vertex3 translation = Vertex3(t[0], t[1], t[2]);
 
-      //Actual vertices for BVH triangle
-      Vertex3 verts[3];
-      // Iterate inside of triangles
-      for (size_t v = 0; v < face_v; ++v)
-      {
-        size_t idx = shape.mesh.indices[idx_offset + v].vertex_index;
-        triangle.vertices_index[v] = idx;
-        verts[v] = vertices_[idx].xyz();
-      }
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> mtls;
 
-      Vertex3 bmin_tri = minimize(minimize(verts[0], verts[1]), verts[2]);
-      Vertex3 bmax_tri = maximize(maximize(verts[0], verts[1]), verts[2]);
-      Box bounds = { bmin_tri, bmax_tri };
-      BVHTriangle btri(verts, bounds, triangle);
-      btris.push_back(btri);
+    std::string err;
+    
+    const char* mtl_basedir_cstr = (mtl_basedir.empty()) 
+      ? NULL
+      : mtl_basedir.c_str();
+    
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &mtls, &err,
+                                obj_file.c_str(), mtl_basedir_cstr);
 
-      if (triangle.mat_id != -1 && materials_[triangle.mat_id].ke != glm::vec4(0.f))
-      {
-        lights_.push_back(triangle);
-      }
+    if (!err.empty()) std::cerr << err << std::endl;
 
+    if (!ret) std::cerr << "Model file could not be parsed !" << std::endl;
+    else std::cout << "Model successfully loaded !" << std::endl;
 
-      //triangles_.push_back(triangle);
-      idx_offset += face_v;
-      i_face++;
+    // Materials
+    size_t mat_offset = materials_.size();
+    for (const auto& mtl : mtls) {
+      materials_.push_back({
+        glm::vec4(mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2], 0.0),                         // kd
+        glm::vec4(mtl.emission[0], mtl.emission[1], mtl.emission[2], 0.0),                      // ke
+        glm::vec4(mtl.specular[0], mtl.specular[1], mtl.specular[2], 0.0),                      // ks
+        glm::vec4(mtl.transmittance[0], mtl.transmittance[1], mtl.transmittance[2], mtl.ior)    // kt + ior
+      });
+      //std::cout << mtl.specular[0] << " " <<  mtl.specular[1] << " " << mtl.specular[2] << std::endl;    // kt + ior
+      //std::cout << mtl.transmittance[0] << " " <<  mtl.transmittance[1] << " " << mtl.transmittance[2] << std::endl;    // kt + ior
     }
+
+    std::cout << "Material parsed" << std::endl;
+
+    // Vertices
+    size_t vertex_offset = vertices_.size();
+    for (size_t i = 0; i < attrib.vertices.size(); i+=3)
+    {
+      Vertex vertex(
+        attrib.vertices[i] * scale + translation.x,
+        attrib.vertices[i + 1] * scale + translation.y,
+        attrib.vertices[i + 2] * scale + translation.z,
+        0.f
+      );
+      vertices_.push_back(vertex);
+
+      Vertex3 v3 = vertex.xyz();
+      bmin = minimize(v3, bmin);
+      bmax = maximize(v3, bmax);
+    }
+
+    std::cout << "Vertices parsed" << std::endl;
+
+    // Triangles
+    for (const auto& shape : shapes)
+    {
+      // Iterate through triangles
+      size_t idx_offset = 0;
+      size_t i_face = 0;
+      for (size_t face_v : shape.mesh.num_face_vertices)
+      {
+        Triangle triangle;
+        triangle.mat_id = shape.mesh.material_ids[i_face] + mat_offset;
+
+        //Actual vertices for BVH triangle
+        Vertex3 verts[3];
+        // Iterate inside of triangles
+        for (size_t v = 0; v < face_v; ++v)
+        {
+          size_t idx = shape.mesh.indices[idx_offset + v].vertex_index + vertex_offset;
+          triangle.vertices_index[v] = idx;
+          verts[v] = vertices_[idx].xyz();
+        }
+
+        Vertex3 bmin_tri = minimize(minimize(verts[0], verts[1]), verts[2]);
+        Vertex3 bmax_tri = maximize(maximize(verts[0], verts[1]), verts[2]);
+        Box bounds = { bmin_tri, bmax_tri };
+        BVHTriangle btri(verts, bounds, triangle);
+        btris.push_back(btri);
+
+        if (triangle.mat_id != -1 && materials_[triangle.mat_id].ke != glm::vec4(0.f))
+        {
+          lights_.push_back(triangle);
+        }
+
+
+        //triangles_.push_back(triangle);
+        idx_offset += face_v;
+        i_face++;
+      }
+    }
+
+    std::cout << "Lights " << lights_.size() << std::endl;
+
+    std::cout << "Triangles parsed" << std::endl;
+
+    std::cout << "Loaded " << vertices_.size()<< " vertices" << std::endl;
+
+    std::cout << "Shape size: " << shapes.size() << std::endl;
+    std::cout << "Face size: " << shapes[0].mesh.num_face_vertices.size() << std::endl;
+    std::cout << "Indices size: " << shapes[0].mesh.indices.size() << std::endl;
+    std::cout << "Pos size: " << attrib.vertices.size() << std::endl;
+    std::cout << "Norm size: " << attrib.normals.size() << std::endl;
+    std::cout << "Tex size: " << attrib.texcoords.size() << std::endl;
+
+    //std::cout << "Bounds are bmin: (" << bmin[0] << ", " << bmin[1] << ", " << bmin[2] << ")\n";
+    //std::cout << "Bounds are bmax: (" << bmax[0] << ", " << bmax[1] << ", " << bmax[2] << ")\n";
   }
-
-  std::cout << "Lights " << lights_.size() << std::endl;
-
-  std::cout << "Triangles parsed" << std::endl;
-
-  std::cout << "Loaded " << vertices_.size()<< " vertices" << std::endl;
-
-  std::cout << "Shape size: " << shapes.size() << std::endl;
-  std::cout << "Face size: " << shapes[0].mesh.num_face_vertices.size() << std::endl;
-  std::cout << "Indices size: " << shapes[0].mesh.indices.size() << std::endl;
-  std::cout << "Pos size: " << attrib.vertices.size() << std::endl;
-  std::cout << "Norm size: " << attrib.normals.size() << std::endl;
-  std::cout << "Tex size: " << attrib.texcoords.size() << std::endl;
-
-  //std::cout << "Bounds are bmin: (" << bmin[0] << ", " << bmin[1] << ", " << bmin[2] << ")\n";
-  //std::cout << "Bounds are bmax: (" << bmax[0] << ", " << bmax[1] << ", " << bmax[2] << ")\n";
+  
   return { btris , { bmin, bmax }};
 }
 
@@ -326,7 +321,7 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
 
   if ((int)tree.size() <= idx)
     tree.resize(idx + 1);
-  if (end - begin < 36 / 2)
+  if (end - begin < 10)
   //if (best_event == -1) //then {found no partition better than leaf}
   {
     BVHNode node = { bounds.bmin, begin, bounds.bmax, end - begin };
