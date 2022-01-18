@@ -323,7 +323,7 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
 
   if ((int)tree.size() <= idx)
     tree.resize(idx + 1);
-  if (end - begin < 10)
+  if (end - begin < 30)
   //if (best_event == -1) //then {found no partition better than leaf}
   {
     BVHNode node = { bounds.bmin, begin, bounds.bmax, end - begin };

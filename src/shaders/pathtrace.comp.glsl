@@ -313,7 +313,6 @@ Collision intersect_bvh(Ray ray)
     BVHNode node = pop(stack);
 
     if (!intersect_box(ray, node.box_min, node.box_max, tmin, col.t != -1 ? col.t : tmax))
-    //if (!intersect_box(ray, node.box_min, node.box_max, tmin, 100000))
       continue;
 
     // Leaf node -> find nearest intersection in list of triangle
@@ -451,9 +450,9 @@ vec3 evaluate_lambert_bsdf(Collision obj_col)
 }
 
 vec3 f0 = vec3(1.00, 0.71, 0.29); //Pre-computed (default is water value)
-//vec3 f0 = vec3(0.05);
-float roughness = 0.05;
-float metalness = 1.0;// = 0.1;//1 if metallic 0 otherwise
+//vec3 f0 = vec3(0.04);
+float roughness = 0.2;
+float metalness = 1;// = 0.1;//1 if metallic 0 otherwise
 
 // Use dotNH for microdetails
 vec3 fresnelSchlick(float dotHV, vec3 albedo)
@@ -538,7 +537,9 @@ vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
   //else
   if (obj_col.mat.specular != vec4(0) || obj_col.mat.transmittance.xyz != vec3(0))
     return evaluate_sot_bsdf(obj_col);
-  else
+  else if (obj_col.mat.albedo.rgb == vec3(0.1, 0.1, 0.69) || obj_col.mat.albedo.rgb == vec3(0.99, 0.85, 0.05))
+    return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
+    else
     return evaluate_lambert_bsdf(obj_col);
 }
 
@@ -628,7 +629,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 8;
+  int max_bounces = 6;
   bool specular_bounce = false;
   float prev_ior = 1.0;
 
@@ -670,9 +671,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
 
     // Absorbance using Beer Law (if not set to pure transmission)
     if (prev_ior != 1.0)
-      throughput *= exp(-vec3(1, 0.5, 0.2) * obj_col.t);
-      //throughput *= exp(-obj_col.mat.transmittance.xyz * obj_col.t);
-      //throughput *= exp(-(vec3(1) - obj_col.mat.transmittance.xyz) * obj_col.t);
+      throughput *= exp(-obj_col.mat.albedo.rgb * obj_col.t);
 
     // Indirect lighting estimation
 

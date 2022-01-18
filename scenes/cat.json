@@ -3,16 +3,16 @@
   "models":
   [
     {
-      "objFile": "../assets/CornellBox-empty3.obj",
+      "objFile": "../assets/CornellBox-empty4.obj",
       "mtlBasedir": "../assets/",
       "scale": 10,
       "translation": [0, 0, 0]
     },
     {
-      "objFile": "../assets/house.obj",
+      "objFile": "../assets/cat.obj",
       "mtlBasedir": "../assets/",
-      "scale": 0.05,
-      "translation": [0, 5, 0]
+      "scale": 0.02,
+      "translation": [2, 0, 0]
     }
   ]
 }
