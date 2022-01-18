@@ -21,7 +21,6 @@
 //#include "../bindings/imgui_impl_glut.h"
 
 #include "program.hh"
-#include "sphere.hh"
 #include "scene.hh"
 
 #define DEBUG
@@ -347,15 +346,6 @@ void init()
   //glEnable(GL_DEPTH_TEST);TEST_OPENGL_ERROR();
   //glDepthFunc(GL_LESS);TEST_OPENGL_ERROR();
 }
-
-//void timer(int value) {
-//  anim();
-//  glutTimerFunc(33, timer, 0);
-//}
-//
-//void init_anim() {
-//  glutTimerFunc(33, timer, 0);
-//}
 
 int main(int argc, char** argv)
 {

@@ -445,7 +445,6 @@ Sample sample_bsdf(inout Collision col, inout uint rngState)
 // This is the lambert one only for now
 vec3 evaluate_lambert_bsdf(Collision obj_col)
 {
-  //return obj_col.mat.albedo;
   return obj_col.mat.albedo.rgb * INV_PI;
 }
 
@@ -532,12 +531,9 @@ vec3 evaluate_sot_bsdf(Collision col)
 
 vec3 evaluate_bsdf(vec3 wo, vec3 wi, Collision obj_col)
 {
-  //if (obj_col.mat.is_microfacet)
-  //  return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
-  //else
   if (obj_col.mat.specular != vec4(0) || obj_col.mat.transmittance.xyz != vec3(0))
     return evaluate_sot_bsdf(obj_col);
-  else if (obj_col.mat.albedo.rgb == vec3(0.1, 0.1, 0.69) || obj_col.mat.albedo.rgb == vec3(0.99, 0.85, 0.05))
+  else if (obj_col.mat.albedo.rgb == vec3(0.1, 0.1, 0.69) || obj_col.mat.albedo.rgb == vec3(0.99, 0.85, 0.05)) // FIXME: Trick for presentation
     return evaluate_cook_torrance_bsdf(wo, wi, obj_col);
     else
     return evaluate_lambert_bsdf(obj_col);
@@ -576,7 +572,6 @@ Sample area_sample(Triangle t, vec3 origin, inout uint rngState)
 // *** NOTE *** : Multiple Importance Sampling (MIS) could be added here
 vec3 uniform_sample_one_light(Collision obj_col, inout uint rngState)
 {
-  // TODO: pick random light
   int rand_i = int(RandomFloat01(rngState) * lights.length());
   TriangleI l_ref = lights[rand_i];
 
