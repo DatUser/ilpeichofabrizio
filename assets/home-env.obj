@@ -1,0 +1,32 @@
+# The original Cornell Box in OBJ format.
+# Note that the real box is not a perfect cube, so
+# the faces are imperfect in this data set.
+#
+# Created by Guedis Cardenas and Morgan McGuire at Williams College, 2011
+# Released into the Public Domain.
+#
+# http://graphics.cs.williams.edu/data
+# http://www.graphics.cornell.edu/online/box/data.html
+#
+
+mtllib home-env.mtl
+
+## Object floor
+v  -100.00  5.25   100
+v   100.00  5.25   100
+v   100.00  5.25  -100
+v  -100.00  5.25  -100
+
+g floor
+usemtl floor
+f -4 -3 -2 -1
+
+## Object light 
+v	-3.5  25.0   3.5
+v	-3.5  25.0  -3.5
+v	 3.5  25.0  -3.5
+v	 3.5  25.0   3.5
+
+g light
+usemtl light
+f -4 -3 -2 -1

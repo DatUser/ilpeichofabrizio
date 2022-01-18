@@ -81,8 +81,8 @@ newmtl shortBox
   Ns 10.0000
   Ni 1.125
   illum 2
-  Ka 0.725 0.71 0.68 # White
-  Kd 0.725 0.71 0.68
+  Ka 0.5 0.5 0.1 # White
+  Kd 0.5 0.5 0.1
   Ks 1 1 1
   Kt 0 0 0 
   
