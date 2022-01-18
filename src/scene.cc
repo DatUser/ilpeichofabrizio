@@ -236,6 +236,26 @@ Vertex3 compute_bmaxL(Box& bounds, Box& boundsR, int axis)
   return Vertex3(bounds.bmax[0], bounds.bmax[1], boundsR.bmin[2]);
 }
 
+Vertex3 compute_vmidL(Box& bounds, int axis)
+{
+  if (axis == 0)
+    return Vertex3(bounds.bmin[0] + (bounds.bmax[0] - bounds.bmin[0]) / 2 , bounds.bmax[1], bounds.bmax[2]);
+  if (axis == 1)
+    return Vertex3(bounds.bmax[0], bounds.bmin[1] + (bounds.bmax[1] - bounds.bmin[1]) / 2 ,  bounds.bmax[2]);
+
+  return Vertex3(bounds.bmax[0], bounds.bmax[1], bounds.bmin[2] + (bounds.bmax[2] - bounds.bmin[2]) / 2);
+}
+
+Vertex3 compute_vmidR(Box& bounds, int axis)
+{
+  if (axis == 0)
+    return Vertex3(bounds.bmin[0] + (bounds.bmax[0] - bounds.bmin[0]) / 2 , bounds.bmin[1], bounds.bmin[2]);
+  if (axis == 1)
+    return Vertex3(bounds.bmin[0], bounds.bmin[1] + (bounds.bmax[1] - bounds.bmin[1]) / 2 ,  bounds.bmin[2]);
+
+  return Vertex3(bounds.bmin[0], bounds.bmin[1], bounds.bmin[2] + (bounds.bmax[2] - bounds.bmin[2]) / 2);
+}
+
 //We consider time to build a triangle is 1
 //We will make further experiences later
 float taabb = 1;
@@ -251,6 +271,7 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
 
   //Find best axis
   int axis = get_best_axis(bounds);
+  std::cout << "Sorted by axis: " << axis << std::endl;
   
   //Sort using best axis
   if (axis == 0)// X 
@@ -264,35 +285,48 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
     std::sort(tris.begin() + begin, tris.begin() + end, vertexZ);
 
   std::vector<float> left_area;
+  std::vector<Box> left_boxes;
   std::vector<float> right_area;
 
   //left_area.push_back(std::numeric_limits<float>::max())
-  Box left_box = tris[begin].bounds;
+  /*Box left_box = tris[begin].bounds;
   for (int i = begin; i < end; ++i)
   {
     left_box = group(left_box, tris[i].bounds);
     left_area.push_back(area(left_box));
+    left_boxes.push_back(left_box);
   }
 
   Box right_box = tris[end - 1].bounds;
   float cost = best_cost;
+
+  Box best_boxr = right_box;
+  Box best_boxl = left_box;//left_area[end - 2];
   for (int i = end - 1; i > begin; --i)
   {
     right_box = group(right_box, tris[i].bounds);
-    Vertex3 bmaxL = compute_bmaxL(bounds, right_box, axis);
-    left_box = { bounds.bmin, bmaxL };
+    //Vertex3 bmaxL = compute_bmaxL(bounds, right_box, axis);
+    left_box = left_boxes[i - 1];//{ bounds.bmin, bmaxL };
     cost = SAH(taabb, ttri, bounds, left_box, i, right_box, end - i);
 
     if (cost < best_cost)
     {
       best_cost = cost;
       best_event = i;
+      best_boxr = right_box;
+      best_boxl = left_box;
     }
-  }
+  }*/
 
-  if (tree.size() <= idx)
+  //std::cout << "Best event is: " << best_event << std::endl;
+
+  //std::cout << "Area of computed left: " << area(best_boxl) <<std::endl;
+  //std::cout << "Actual area of left: " << left_area[best_event - 1] << std::endl;
+
+  if ((int)tree.size() <= idx)
     tree.resize(idx + 1);
-  if (best_event == -1) //then {found no partition better than leaf}
+  if (end - begin < 36 / 2)
+  //if (best_event == -1) //then {found no partition better than leaf}
   {
     BVHNode node = { bounds.bmin, begin, bounds.bmax, end - begin };
     tree[idx] = node;
@@ -300,12 +334,24 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
   }
   else
   {
-    BVHNode node = { bounds.bmin, 2 * idx + 1/*tree.size()*/, bounds.bmax, 0 };
+    BVHNode node = { bounds.bmin, 2 * idx + 1, bounds.bmax, 0 };
     tree[idx] = node;
     //tree.push_back(node);
 
     int mid = begin + (end - begin) / 2;
-    build_bvh(tris, left_box, begin, mid, tree, 2 * idx + 1);
-    build_bvh(tris, right_box, mid, end, tree, 2 * idx + 2);
+    //Vertex3 vmidL = compute_vmidL(bounds, axis);//bounds.bmin + (bounds.bmax - bounds.bmin) / 2;
+    //Vertex3 vmidR = compute_vmidR(bounds, axis);
+
+    
+
+    Box best_boxl = { bounds.bmin, bounds.bmin };//vmidL };
+    for (int i = begin; i < mid; ++i)
+      best_boxl = group(best_boxl, tris[i].bounds);
+    Box best_boxr = { /*vmidR*/bounds.bmax, bounds.bmax };
+    for (int i = end - 1; i >= mid; --i)
+      best_boxr = group(best_boxr, tris[i].bounds);
+    //int mid = best_event;
+    build_bvh(tris, best_boxl, begin, mid, tree, 2 * idx + 1);
+    build_bvh(tris, best_boxr, mid, end, tree, 2 * idx + 2);
   }
 }
