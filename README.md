@@ -1,7 +1,11 @@
-# Physically Based Rendering on Sphere
+# Pathtracer
 
-Implementation of physically based rendering lightning that depends on
-roughness and metalness of material.
+Mederic Carriat
+Gomez Xavier
+
+# Results
+
+https://youtu.be/QbSvGH9mtfk
 
 
 ## How to build and run
