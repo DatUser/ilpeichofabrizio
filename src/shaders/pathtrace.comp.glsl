@@ -629,7 +629,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 6;
+  int max_bounces = 4;
   bool specular_bounce = false;
   float prev_ior = 1.0;
 

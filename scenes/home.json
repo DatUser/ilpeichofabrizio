@@ -1,9 +1,15 @@
 {
-  "camera": [0, 10, 45],
+  "camera": [-5, 7, 10],
   "models":
   [
-        {
+    {
       "objFile": "../assets/home.obj",
+      "mtlBasedir": "../assets/",
+      "scale": 1,
+      "translation": [0, 0, 0]
+    },
+    {
+      "objFile": "../assets/home-env.obj",
       "mtlBasedir": "../assets/",
       "scale": 1,
       "translation": [0, 0, 0]

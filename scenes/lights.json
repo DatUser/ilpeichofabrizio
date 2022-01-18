@@ -1,0 +1,12 @@
+{
+  "camera": [0, 5, 15],
+  "models":
+  [
+    {
+      "objFile": "../assets/CornellBox-lights.obj",
+      "mtlBasedir": "../assets/",
+      "scale": 5,
+      "translation": [0, 0, 0]
+    }
+  ]
+}
