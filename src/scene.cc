@@ -271,6 +271,7 @@ void Scene::build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, in
 
   //Find best axis
   int axis = get_best_axis(bounds);
+  axis = std::rand() % 3;
   std::cout << "Sorted by axis: " << axis << std::endl;
   
   //Sort using best axis
