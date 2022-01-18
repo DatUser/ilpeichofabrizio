@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iostream>
 
-#define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
 std::vector<Triangle> BtriToTri(std::vector<BVHTriangle>& btris)
