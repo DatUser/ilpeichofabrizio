@@ -52,6 +52,8 @@ Vertex3 maximize(const Vertex3& a, const Vertex3& b)
 
 std::pair<std::vector<BVHTriangle>, Box> Scene::parse_scene(json j)
 {
+  auto c = j.at("camera").get<std::array<float, 3>>();
+  cam_pos_ = Vertex3(c[0], c[1], c[2]);
 
   Vertex3 bmin = Vertex3(std::numeric_limits<float>::max());
   Vertex3 bmax = Vertex3(std::numeric_limits<float>::min());

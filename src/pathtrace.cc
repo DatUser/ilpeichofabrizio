@@ -76,7 +76,7 @@ glm::vec2 start_pos;
 float yaw = -90.0;
 float pitch = 0.0;
 glm::vec3 cameraFront;
-glm::vec3 cameraPos   = glm::vec3(0, 1.0f, 4.0f);
+glm::vec3 cameraPos;
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
 void write_node_label(const std::vector<BVHNode>& tree, int node_id,
@@ -263,6 +263,11 @@ void display()
   u_cam2world_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
   glUniformMatrix4fv(u_cam2world_id, 1, GL_FALSE, &cam2world[0][0]);TEST_OPENGL_ERROR();
 
+  GLint u_campos_id;
+  name = "u_campos";
+  u_campos_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
+  glUniform3fv(u_campos_id, 1, &cameraPos[0]);
+
   GLint u_is_moving_id;
   name = "u_is_moving";
   u_is_moving_id = glGetUniformLocation(pathtrace_shader->get_id(), name.c_str());TEST_OPENGL_ERROR();
@@ -352,29 +357,12 @@ void init()
 //  glutTimerFunc(33, timer, 0);
 //}
 
-void init_uniform(program* instance)
-{
-  glm::vec3 camPos = glm::vec3(0.0f, 0.0f, 4.0f);
-  glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
-  glm::vec3 camFront = glm::vec3(0.0f, 0.0f, -1.0f);
-
-  glm::mat4 proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 100.0f); 
-  glm::mat4 model = glm::mat4(1.0f);
-  glm::mat4 view = glm::lookAt(camPos, camPos + camFront, camUp);
-
-  glm::mat4 locToProj = proj * view * model;
-
-  GLint projection_location =
-    glGetUniformLocation(instance->get_id(), "localToProjection");TEST_OPENGL_ERROR();
-  glUniformMatrix4fv(projection_location, 1, GL_FALSE, &locToProj[0][0]);
-
-  TEST_OPENGL_ERROR();
-}
-
 int main(int argc, char** argv)
 {
   Scene scene("../scenes/cornell.json");
   std::cout << scene.get_materials().size() << std::endl;
+
+  cameraPos = scene.get_cam_pos();
 
   initGlut(argc, argv);
 
