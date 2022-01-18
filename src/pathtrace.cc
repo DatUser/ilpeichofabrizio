@@ -237,13 +237,13 @@ void keyboardUpFunc(unsigned char key, int x, int y)
 void update_camera_pos()
 {
   if (keys_wasd[0])
-    cameraPos += 0.05f * cameraFront;
+    cameraPos += 0.2f * cameraFront;
   else if (keys_wasd[1])
-    cameraPos -= 0.05f * cameraFront;
+    cameraPos -= 0.2f * cameraFront;
   else if (keys_wasd[2])
-    cameraPos -= 0.05f * glm::normalize(glm::cross(cameraFront, cameraUp));
+    cameraPos -= 0.2f * glm::normalize(glm::cross(cameraFront, cameraUp));
   else if (keys_wasd[3])
-    cameraPos += 0.05f * glm::normalize(glm::cross(cameraFront, cameraUp));
+    cameraPos += 0.2f * glm::normalize(glm::cross(cameraFront, cameraUp));
 }
 
 void display()
@@ -359,7 +359,7 @@ void init()
 
 int main(int argc, char** argv)
 {
-  Scene scene("../scenes/cornell.json");
+  Scene scene(argv[1]);
   std::cout << scene.get_materials().size() << std::endl;
 
   cameraPos = scene.get_cam_pos();
