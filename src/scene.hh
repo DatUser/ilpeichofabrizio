@@ -13,12 +13,11 @@ using json = nlohmann::json;
 using Vertex = glm::vec4;
 using Vertex3 = glm::vec3;
 
-#pragma align(32)
 struct BVHNode {
-  Vertex3 box_min; // 16 byte aligned -> 12 = (3 * 4)
+  Vertex3 box_min; 
   int left_child;
-  Vertex3 box_max; // 16 byte aligned -> 12 = (3 * 4)
-  int num_triangles; // 0 flags inner node -> 16 = (12 + 4)
+  Vertex3 box_max;
+  int num_triangles;
 };
 
 struct Material

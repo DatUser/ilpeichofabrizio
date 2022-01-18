@@ -5,6 +5,9 @@ layout (binding = 0) uniform sampler2D tex;
 in vec2 uv;
 out vec4 FragColor;
 
+
+// sRGB conversion + tone mapping functions from Alan Wolfe
+
 vec3 LessThan(vec3 f, float value)
 {
     return vec3(
