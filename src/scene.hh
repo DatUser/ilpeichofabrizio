@@ -81,6 +81,7 @@ class Scene
   public:
     Scene(const std::string& path);
 
+    const Vertex3& get_cam_pos() { return cam_pos_; };
     const std::vector<Vertex>& get_vertices() { return vertices_; };
     const std::vector<Material>& get_materials() { return materials_; };
     const std::vector<Triangle>& get_triangles() { return triangles_; };
@@ -95,6 +96,7 @@ class Scene
     void build_bvh(std::vector<BVHTriangle>& tris, Box& bounds, int begin, int end,
                   std::vector<BVHNode>& tree, int idx);
 
+    Vertex3 cam_pos_;
     std::vector<Vertex> vertices_;
     std::vector<Material> materials_;  
     std::vector<Triangle> triangles_;

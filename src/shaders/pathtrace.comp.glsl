@@ -43,6 +43,7 @@ layout (std430, binding=7) buffer tree_buffer { BVHNode tree[]; };
 uniform int u_frame;
 uniform int u_is_moving;
 uniform mat4 u_cam2world;
+uniform vec3 u_campos;
 
 
 // *****************************************************************************
@@ -627,7 +628,7 @@ vec3 pathtrace(Ray ray, inout uint rngState)
   vec3 L = vec3(0);                    // Total radiance estimate
   vec3 throughput = vec3(1);           // Current path throughput
 
-  int max_bounces = 1;
+  int max_bounces = 8;
   bool specular_bounce = false;
   float prev_ior = 1.0;
 
