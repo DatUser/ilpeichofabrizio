@@ -84,16 +84,24 @@ void write_node_label(const std::vector<BVHNode>& tree, int node_id,
 {
   Vertex3 bmin = tree[node_id].box_min;
   Vertex3 bmax = tree[node_id].box_max;
+  int left = tree[node_id].left_child;
+  int count = tree[node_id].num_triangles;
   file << node_id << " [label=\"";
   file << "bmin: (" << bmin[0] << ", " << bmin[1] << ", " << bmin[2] << ")\\n";
-  file << "bmax: (" << bmax[0] << ", " << bmax[1] << ", " << bmax[2] << ")";
-  file << "\"];" << std::endl;
+  file << "bmax: (" << bmax[0] << ", " << bmax[1] << ", " << bmax[2] << ")\\n";
+  file << "left: " << left << "\\n";
 
   if (!tree[node_id].num_triangles)
   {
-    int left = tree[node_id].firstChildNodeID;
+    file << "right: " << left + 1;
+    file << "\"];" << std::endl;
     write_node_label(tree, left, file);
     write_node_label(tree, left + 1, file);
+  }
+  else
+  {
+    file << "right: " << left + count - 1;
+    file << "\"];" << std::endl;
   }
 }
 
@@ -102,7 +110,7 @@ void write_node(const std::vector<BVHNode>& tree, int node_id, std::ofstream& fi
   //Inner nodes have 0 in num triangles
   if (!tree[node_id].num_triangles)
   {
-    int left = tree[node_id].firstChildNodeID;
+    int left = tree[node_id].left_child;
     file << node_id << " -> " << left << std::endl;
     file << node_id << " -> " << left + 1 << std::endl;
     write_node(tree, left, file);
@@ -483,7 +491,7 @@ int main(int argc, char** argv)
   std::cout << "BVH size: " << scene.get_bvh().size() << std::endl;
   std::cout << "NB triangles: " << scene.get_triangles().size() << std::endl;
   
-  //treeToDot(scene.get_bvh());
+  treeToDot(scene.get_bvh());
   glutMainLoop();
 
   delete pathtrace_shader;

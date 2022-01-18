@@ -32,9 +32,9 @@ layout (std430, binding=6) buffer lights_buffer { TriangleI lights[]; };
 struct BVHNode
 {
   vec3 box_min;
-  uint left_child;
+  int left_child;
   vec3 box_max;
-  uint count;
+  int count;
 };
 
 layout (std430, binding=7) buffer tree_buffer { BVHNode tree[]; };
@@ -245,7 +245,7 @@ void nearest_triangle(BVHNode node, Ray ray, inout Collision col, inout Collisio
 {
   for (int i = 0; i < node.count; ++i)
   {
-    TriangleI t_ref = triangles[i];
+    TriangleI t_ref = triangles[node.left_child+i];
 
     Triangle triangle;
     triangle.p0 = vertices[int(t_ref.vertices_index.x)].xyz;    // FIXME should pass int directly
@@ -268,54 +268,51 @@ void nearest_triangle(BVHNode node, Ray ray, inout Collision col, inout Collisio
 // *                                 BVH                                      *
 // *****************************************************************************
 
-int stack[64];
-int index = -1;
-int stack_len = 0;
-
-BVHNode stack_pop()
+struct Stack
 {
-  int node_i = stack[index];
-  index--;
-  stack_len--;
+  int values[64];
+  int size;
+};
+
+BVHNode pop(inout Stack stack)
+{
+  int node_i = stack.values[stack.size-1];
+  stack.size--;
   return tree[node_i];
 }
 
-void stack_push(int node_i)
+void push(inout Stack stack, int node_i)
 {
-  index++;
-  stack_len++;
-  stack[index] = node_i;
+  stack.values[stack.size] = node_i;
+  stack.size++;
 }
 
-bool stack_is_empty()
+bool is_empty(Stack stack)
 {
-  return stack_len == 0;
-}
-
-void stack_clear()
-{
-  index = -1;
-  stack_len = 0;
+  return stack.size == 0;
 }
 
 Collision intersect_bvh(Ray ray)
 {
+  Stack stack;
+  stack.size = 0;
+
   Collision col;
   col.t = -1;
   Collision min_col;
   min_col.t = -1;
 
-  stack_clear();
-  stack_push(0); // push root
+  push(stack, 0); // push root
 
   float tmin = 0.001;
   float tmax = 1.0 / 0.0;
 
-  while (!stack_is_empty())
+  while (!is_empty(stack))
   {
-    BVHNode node = stack_pop();
+    BVHNode node = pop(stack);
 
     if (!intersect_box(ray, node.box_min, node.box_max, tmin, col.t != -1 ? col.t : tmax))
+    //if (!intersect_box(ray, node.box_min, node.box_max, tmin, 100000))
       continue;
 
     // Leaf node -> find nearest intersection in list of triangle
@@ -326,10 +323,9 @@ Collision intersect_bvh(Ray ray)
     // Internal node -> continue traversing internal boxes
     else
     {
-      stack_push(int(node.left_child) + 1);  // push right child
-      stack_push(int(node.left_child));      // push left child
+      push(stack, node.left_child + 1);  // push right child
+      push(stack, node.left_child);      // push left child
     }
-
   }
 
   return min_col;
@@ -767,7 +763,6 @@ void main()
       blend
     );
   }
-
 
   imageStore(new_frame, pixel, vec4(acc_color.xyz, 1.0));
 
